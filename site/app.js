@@ -50,8 +50,9 @@ function visible() {
 }
 
 // ---- map ----------------------------------------------------------------------------------------------------------
-const dark = window.matchMedia("(prefers-color-scheme: dark)");
-const styleUrl = () => `https://tiles.openfreemap.org/styles/${dark.matches ? "dark" : "positron"}`;
+// theme.js (loaded in <head>) says whether the page is light or dark: Auto follows the device, or the viewer's pick.
+const isDark = () => (window.siteTheme ? window.siteTheme.effective() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+const styleUrl = () => `https://tiles.openfreemap.org/styles/${isDark() ? "dark" : "positron"}`;
 const map = new MLMap({ container: "map", style: styleUrl(), center: [-78.6, 37.9], zoom: 5.9, attributionControl: { compact: true }, cooperativeGestures: false });
 map.addControl(new NavigationControl({ showCompass: false }), "top-right");
 map.fitBounds([[-83.7, 36.5], [-75.2, 39.5]], { padding: 20, animate: false });
@@ -60,7 +61,7 @@ function geojson(list) {
   return { type: "FeatureCollection", features: list.map((f) => ({ type: "Feature", geometry: { type: "Point", coordinates: [f.lon, f.lat] }, properties: { id: String(f.id), stage: f.stage, order: 4 - STAGE_ORDER[f.stage] } })) };
 }
 function addLayers() {
-  const c = { op: css("--st-operating"), pl: css("--st-planned"), sd: css("--st-shutdown"), ring: dark.matches ? "#0c0c0c" : "#ffffff", navy: dark.matches ? "#aebdf0" : "#232d4b" };
+  const c = { op: css("--st-operating"), pl: css("--st-planned"), sd: css("--st-shutdown"), ring: isDark() ? "#0c0c0c" : "#ffffff", navy: isDark() ? "#aebdf0" : "#232d4b" };
   map.addSource("area", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "area-fill", type: "fill", source: "area", paint: { "fill-color": c.navy, "fill-opacity": 0.07 } });
   map.addLayer({ id: "area-line", type: "line", source: "area", paint: { "line-color": c.navy, "line-width": 2, "line-dasharray": [2, 1.5] } });
@@ -76,7 +77,8 @@ function addLayers() {
   drawSearch(false);
 }
 map.on("style.load", addLayers);
-dark.addEventListener("change", () => map.setStyle(styleUrl()));
+// Swap the basemap (and re-add the layers in the new theme's colors) when the theme changes.
+window.addEventListener("themechange", () => map.setStyle(styleUrl()));
 
 map.on("mouseenter", "dc", () => { map.getCanvas().style.cursor = "pointer"; });
 map.on("mouseleave", "dc", () => { map.getCanvas().style.cursor = state.mode === "pin" ? "crosshair" : ""; });

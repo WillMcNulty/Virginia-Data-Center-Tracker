@@ -7,6 +7,7 @@
 <meta name="description" content="Every data center Virginia's Department of Environmental Quality knows about, on a map: planned, under construction and operating. Search by ZIP code, school or a pin on the map.">
 <meta name="theme-color" content="#232d4b">
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
+<script src="theme.js"></script>
 <style>
   /* Same design language as willmcnulty.github.io and the UVA Capital Plan Tracker. Map marker colors were checked
      for colorblind separation (every pair, since any two points can sit side by side) against the basemap
@@ -24,8 +25,9 @@
     --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --mono: "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
   }
+  /* Dark: follows the device (Auto) unless the theme button picked Light; or always when it picked Dark. */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       color-scheme: dark;
       --page: #0d1120; --surface: #161c30; --ink: #eef1fa; --ink-2: #a6b1cf; --muted: #8c97b8;
       --line: #2b3454; --grid: #232b45; --axis: #34406a;
@@ -33,6 +35,14 @@
       --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5; --wash: rgba(174, 189, 240, 0.07);
       --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98;
     }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d1120; --surface: #161c30; --ink: #eef1fa; --ink-2: #a6b1cf; --muted: #8c97b8;
+    --line: #2b3454; --grid: #232b45; --axis: #34406a;
+    --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
+    --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5; --wash: rgba(174, 189, 240, 0.07);
+    --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.55 var(--sans); }
@@ -46,6 +56,8 @@
   .topbar nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; font-weight: 600; }
   .topbar nav a { color: var(--band-muted); text-decoration: none; }
   .topbar nav a:hover { color: var(--orange); }
+  .theme-btn { font: 600 13px var(--sans); color: var(--band-muted); background: none; border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px; padding: 2px 11px; cursor: pointer; }
+  .theme-btn:hover { color: var(--orange); border-color: var(--orange); }
   .hero { border-bottom: 8px solid var(--orange); }
   .hero .wrap { padding-block: 40px 36px; }
   .kicker { font: 700 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: #ff8f2e; margin-bottom: 12px; }
@@ -138,6 +150,7 @@
         <a href="#about">About the data</a>
         <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a>
         <a href="https://willmcnulty.github.io/">By William McNulty</a>
+        <button type="button" class="theme-btn" data-theme-toggle>◐ Auto</button>
       </nav>
     </div>
   </header>
