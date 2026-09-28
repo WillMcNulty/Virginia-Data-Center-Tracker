@@ -1,0 +1,67 @@
+name: Refresh, test and deploy
+
+on:
+  schedule:
+    - cron: "17 10 * * *"   # daily, 6:17 am Eastern (DEQ's layer updates daily)
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to commit refreshed data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Rebuild from the live sources (stops if a source looks broken)
+        run: python build.py
+      - name: Python tests
+        run: python -m unittest discover tests -v
+      - name: Search tests
+        run: node tests/geo.test.mjs
+      - name: Commit refreshed data if the data changed
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          # meta.json's build time changes every run; only commit when the data itself changed.
+          if git diff --quiet -- site/data/facilities.json site/data/schools.json site/data/zips.json; then
+            echo "No data changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add site/data
+            git commit -m "Refresh data from DEQ ($(date -u +%F))"
+            git push
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

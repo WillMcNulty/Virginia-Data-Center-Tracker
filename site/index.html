@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virginia Data Center Tracker</title>
+<meta name="description" content="Every data center Virginia's Department of Environmental Quality knows about, on a map: planned, under construction and operating. Search by ZIP code, school or a pin on the map.">
+<meta name="theme-color" content="#232d4b">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<style>
+  /* Same design language as willmcnulty.github.io and the UVA Capital Plan Tracker. Map marker colors were checked
+     for colorblind separation (every pair, since any two points can sit side by side) against the basemap
+     backgrounds: #495e9d / #e57200 on #f2f3f0 (light) and #6f86e0 / #d0650a on #0c0c0c (dark). Stage is never
+     shown by color alone: markers carry a white ring, and every list and popup spells the stage out. */
+  :root {
+    color-scheme: light;
+    --page: #f6f7fb; --surface: #ffffff; --ink: #141b33; --ink-2: #4d5876; --muted: #667091;
+    --line: #d9deeb; --grid: #e6e9f2; --axis: #c3c9da;
+    --navy: #232d4b; --orange: #e57200; --orange-ink: #141b33; --orange-tint: #fff0df; --blue-tint: #e6ebf6;
+    --band: #232d4b; --band-ink: #ffffff; --band-muted: #c6cfe8; --link: #232d4b;
+    --wash: rgba(35, 45, 75, 0.05);
+    --st-operating: #495e9d; --st-planned: #e57200; --st-shutdown: #8a8f98;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d1120; --surface: #161c30; --ink: #eef1fa; --ink-2: #a6b1cf; --muted: #8c97b8;
+      --line: #2b3454; --grid: #232b45; --axis: #34406a;
+      --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
+      --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5; --wash: rgba(174, 189, 240, 0.07);
+      --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.55 var(--sans); }
+  a { color: var(--link); text-underline-offset: 3px; }
+  a:hover { color: var(--orange); }
+  :focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .wrap { max-width: 1200px; margin-inline: auto; padding-inline: 20px; }
+  .band { background: var(--band); color: var(--band-ink); }
+  .topbar .wrap { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; align-items: baseline; padding-block: 16px; }
+  .topbar strong { font: 600 18px var(--serif); }
+  .topbar nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; font-weight: 600; }
+  .topbar nav a { color: var(--band-muted); text-decoration: none; }
+  .topbar nav a:hover { color: var(--orange); }
+  .hero { border-bottom: 8px solid var(--orange); }
+  .hero .wrap { padding-block: 40px 36px; }
+  .kicker { font: 700 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: #ff8f2e; margin-bottom: 12px; }
+  .hero h1 { font: 600 clamp(30px, 5vw, 48px)/1.1 var(--serif); letter-spacing: -0.015em; margin: 0 0 14px; max-width: 22ch; }
+  .hero h1 .hl { color: var(--orange); }
+  .hero p { max-width: 70ch; margin: 0; color: var(--band-muted); font-size: 16.5px; }
+  .evidence { background: var(--orange-tint); border-bottom: 1px solid var(--line); }
+  .evidence .wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px 26px; padding-block: 22px; }
+  .stat { display: flex; flex-direction: column; }
+  .stat b { order: -1; font: 700 28px/1.1 var(--mono); color: var(--navy); }
+  .stat b::after { content: ""; display: block; width: 28px; height: 4px; background: var(--orange); margin-top: 8px; }
+  .stat span { margin-top: 8px; font-size: 13.5px; font-weight: 600; }
+  .stat em { font-style: normal; font-size: 12.5px; color: var(--ink-2); }
+
+  main { padding-block: 24px 30px; }
+  .layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .card h2 { font: 600 21px/1.25 var(--serif); color: var(--navy); margin: 0 0 4px; }
+  .sub { margin: 0 0 12px; color: var(--ink-2); font-size: 14px; }
+  .seg { display: flex; border: 2px solid var(--navy); border-radius: 6px; overflow: hidden; margin-bottom: 12px; }
+  .seg button { flex: 1; font: 700 13px var(--sans); background: var(--surface); color: var(--navy); border: 0; padding: 8px 6px; cursor: pointer; }
+  .seg button + button { border-left: 2px solid var(--navy); }
+  .seg button[aria-pressed="true"] { background: var(--navy); color: var(--surface); }
+  label.field { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }
+  input[type="text"], select {
+    font: inherit; font-size: 15px; color: var(--ink); background: var(--surface); width: 100%;
+    border: 1px solid var(--axis); border-radius: 6px; padding: 9px 11px;
+  }
+  .row { display: flex; gap: 10px; align-items: end; margin-bottom: 10px; }
+  .row > div { flex: 1; }
+  .row > div.narrow { flex: 0 0 120px; }
+  .hint { font-size: 12.5px; color: var(--ink-2); margin: 4px 0 0; }
+  .suggest { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 6px; max-height: 240px; overflow: auto; }
+  .suggest:empty { display: none; }
+  .suggest li button { display: block; width: 100%; text-align: left; font: inherit; font-size: 14px; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 8px 10px; cursor: pointer; color: var(--ink); }
+  .suggest li:last-child button { border-bottom: 0; }
+  .suggest li button:hover, .suggest li button:focus-visible { background: var(--wash); }
+  .suggest small { color: var(--ink-2); }
+  fieldset { border: 0; padding: 0; margin: 12px 0 0; }
+  legend { font-size: 13px; font-weight: 600; color: var(--ink-2); padding: 0; margin-bottom: 4px; }
+  .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .checks input { accent-color: var(--navy); }
+
+  .summary { margin: 14px 0 8px; font-size: 14.5px; }
+  .summary b { font-family: var(--mono); }
+  .results { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; border-top: 1px solid var(--line); }
+  .results li { border-bottom: 1px solid var(--line); }
+  .results button { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 2px 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 4px; cursor: pointer; font: inherit; color: var(--ink); }
+  .results button:hover, .results button:focus-visible { background: var(--wash); }
+  .results .nm { font-weight: 600; font-size: 14px; line-height: 1.35; }
+  .results .dist { font: 700 13px var(--mono); color: var(--navy); white-space: nowrap; }
+  .results .meta { grid-column: 2 / 4; font-size: 12.5px; color: var(--ink-2); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--axis); }
+  .dot.planned, .dot.construction { background: var(--st-planned); }
+  .dot.operating { background: var(--st-operating); }
+  .dot.shutdown, .dot.other { background: var(--st-shutdown); }
+  .dot.construction { background: radial-gradient(circle, var(--surface) 0 2px, var(--st-planned) 2.5px); }
+  .tag { display: inline-block; font: 700 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--blue-tint); color: var(--navy); }
+  .tag.planned, .tag.construction { background: var(--orange-tint); color: var(--ink); }
+
+  #map { height: 640px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; }
+  @media (max-width: 900px) { #map { height: 440px; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink-2); margin: 10px 2px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .maplibregl-popup-content { background: var(--surface); color: var(--ink); border-radius: 8px; padding: 12px 14px; font: 13.5px/1.45 var(--sans); }
+  .maplibregl-popup-tip { border-top-color: var(--surface) !important; border-bottom-color: var(--surface) !important; }
+  .maplibregl-popup-close-button { font-size: 20px; color: var(--ink-2); padding: 0 6px; }
+  .pop h3 { font: 600 15px/1.3 var(--sans); margin: 0 0 4px; padding-right: 16px; }
+  .pop p { margin: 4px 0; }
+  .pop .src { font-size: 12px; color: var(--ink-2); }
+
+  .info { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 20px; }
+  .info h2 { font: 800 12px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); margin: 0 0 8px; }
+  .info p, .info li { font-size: 14px; margin: 0 0 8px; }
+  .info ul { padding-left: 18px; margin: 0; }
+  .disclaimer { font-size: 12.5px; color: var(--ink-2); border-left: 3px solid var(--orange); padding-left: 10px; }
+  footer.band { font-size: 14px; color: var(--band-muted); margin-top: 26px; }
+  footer .wrap { padding-block: 24px 36px; display: grid; gap: 6px; }
+  footer a { color: var(--band-ink); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+  <header class="topbar band">
+    <div class="wrap">
+      <strong>Virginia Data Center Tracker</strong>
+      <nav aria-label="Links">
+        <a href="#about">About the data</a>
+        <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a>
+        <a href="https://willmcnulty.github.io/">By William McNulty</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero band" aria-labelledby="top">
+    <div class="wrap">
+      <div class="kicker">From Virginia DEQ records · refreshed daily</div>
+      <h1 id="top">What data centers are near you, <span class="hl">and which are still to come?</span></h1>
+      <p>Every data center Virginia's Department of Environmental Quality has on record, planned, under construction
+        or operating, on one map. Search around a ZIP code, a school, or any spot you pick on the map. An independent
+        project; not affiliated with DEQ or any locality.</p>
+    </div>
+  </section>
+
+  <div class="evidence" aria-label="Headline numbers"><div class="wrap" id="stats"></div></div>
+
+  <main class="wrap">
+    <div class="layout">
+      <section class="card" aria-labelledby="search-h">
+        <h2 id="search-h">Search near a place</h2>
+        <p class="sub">Searches run in your browser; nothing you enter is sent anywhere.</p>
+        <div class="seg" role="group" aria-label="Search by">
+          <button type="button" data-mode="zip" aria-pressed="true">ZIP code</button>
+          <button type="button" data-mode="school" aria-pressed="false">School</button>
+          <button type="button" data-mode="pin" aria-pressed="false">Pin on map</button>
+        </div>
+        <div class="row">
+          <div id="q-wrap">
+            <label class="field" for="q" id="q-label">ZIP code</label>
+            <input type="text" id="q" inputmode="numeric" autocomplete="off" placeholder="e.g. 20171">
+          </div>
+          <div class="narrow">
+            <label class="field" for="radius">Within</label>
+            <select id="radius">
+              <option value="1">1 mile</option>
+              <option value="3" selected>3 miles</option>
+              <option value="5">5 miles</option>
+              <option value="10">10 miles</option>
+              <option value="30">30 miles</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" id="q-hint">Any Virginia ZIP code. Distances are measured from the ZIP code's center.</p>
+        <ul class="suggest" id="suggest" aria-label="Matching schools"></ul>
+        <fieldset>
+          <legend>Show</legend>
+          <div class="checks" id="stage-filter">
+            <label><input type="checkbox" value="planned" checked> Planned</label>
+            <label><input type="checkbox" value="construction" checked> Under construction</label>
+            <label><input type="checkbox" value="operating" checked> Operating</label>
+            <label><input type="checkbox" value="shutdown" checked> Shut down</label>
+          </div>
+          <div class="checks" style="margin-top:6px">
+            <label><input type="checkbox" id="recent"> Only those with an air permit issued in the last 6 months</label>
+          </div>
+        </fieldset>
+        <p class="summary" id="summary" aria-live="polite"></p>
+        <ul class="results" id="results"></ul>
+      </section>
+
+      <section aria-label="Map">
+        <div id="map" role="region" aria-label="Map of data centers"></div>
+        <div class="legend" id="legend" aria-hidden="true">
+          <span><i class="dot planned"></i> Planned</span>
+          <span><i class="dot construction"></i> Under construction</span>
+          <span><i class="dot operating"></i> Operating</span>
+          <span><i class="dot shutdown"></i> Shut down</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="info" id="about">
+      <div class="card">
+        <h2>What this shows</h2>
+        <p>Every site DEQ flags as a data center in its daily <a href="https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294">Air Sites</a> records.
+          Data centers need a DEQ air permit for their backup diesel generators, so this covers projects from the
+          point they apply for one. The stage (planned, under construction, operating) is DEQ's own.</p>
+        <p>Air permit dates come from DEQ's <a href="https://www.deq.virginia.gov/news-info/shortcuts/permits/air/issued-air-permits-for-data-centers">issued-permits list</a>,
+          saved <span id="snap-date"></span>. Sites DEQ has on record but hasn't issued a permit for yet show no date.</p>
+      </div>
+      <div class="card">
+        <h2>What it doesn't show yet</h2>
+        <ul>
+          <li><b>Earlier proposals.</b> A rezoning or special exception is filed with the county before any air permit,
+            so the newest proposals may not be here yet. County records are the next thing to add.</li>
+          <li><b>Cost and size.</b> These come from county building permits, also next.</li>
+          <li><b>Meetings and how to take part.</b> Upcoming hearings, comment periods and who decides, by ZIP code, are planned.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Sources and related work</h2>
+        <ul>
+          <li>Virginia Department of Environmental Quality: Air Sites (Daily) and the issued air permits list.</li>
+          <li>Schools: National Center for Education Statistics, public school locations 2024-25.</li>
+          <li>ZIP codes: U.S. Census Bureau ZIP Code Tabulation Areas (2025 Gazetteer).</li>
+          <li>Map: <a href="https://openfreemap.org/">OpenFreeMap</a>, © OpenMapTiles, data © OpenStreetMap contributors.
+            Map images are loaded from OpenFreeMap, which sees which area of the map is being viewed.</li>
+          <li>Related maps: the Piedmont Environmental Council's <a href="https://www.pecva.org/region/culpeper/existing-and-proposed-data-centers-a-web-map/">Existing and Proposed Data Centers</a> map, and
+            <a href="https://brockovichdatacenter.com/">Brockovich Data Center Reporting</a>.</li>
+        </ul>
+        <p class="disclaimer" id="disclaimer"></p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="band">
+    <div class="wrap" id="footer">
+      <div>Independent project; not affiliated with Virginia DEQ, any locality, or any company shown.</div>
+      <div>Data last refreshed <span id="built"></span>. <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code and data on GitHub</a> · <a href="https://willmcnulty.github.io/">More projects by William McNulty</a></div>
+    </div>
+  </footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
