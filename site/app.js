@@ -40,6 +40,8 @@ const schoolById = new Map(schools.map((s) => [s.id, s]));
   $("#snap-date").textContent = fmtDate(meta.permit_snapshot);
   $("#built").textContent = new Date(meta.built_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
   $("#disclaimer").textContent = meta.deq_disclaimer ? "DEQ's data notice: " + meta.deq_disclaimer : "";
+  // The donate link stays hidden until data/site_config.json has a support_url.
+  if (meta.support_url) { const a = $("#support-link"); a.href = meta.support_url; a.textContent = meta.support_label || "Support this project"; a.hidden = false; }
 }
 
 // ---- state --------------------------------------------------------------------------------------------------------

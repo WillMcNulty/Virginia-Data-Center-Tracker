@@ -81,5 +81,59 @@ class BuiltData(unittest.TestCase):
                 self.assertRegex(p["issued"] or "", r"^\d{4}-\d{2}-\d{2}$|^$")
 
 
+class GeneratedPages(unittest.TestCase):
+    """The static pages for search engines: built into a temporary folder from the committed data."""
+
+    @classmethod
+    def setUpClass(cls):
+        import re
+        import shutil
+        import tempfile
+        import pages
+        cls.re = re
+        cls.dir = tempfile.mkdtemp()
+        for f in ("index.html", "pages.css", "theme.js", "app.js"):
+            shutil.copy(os.path.join(ROOT, "site", f), cls.dir)
+        cfg = json.load(open(os.path.join(ROOT, "data", "site_config.json"), encoding="utf-8"))
+        cls.cfg = cfg
+        cls.counts = pages.build_pages(cls.dir, load("facilities"), load("schools"), load("zips"), load("meta"), cfg)
+        cls.html = {}
+        for root, _, files in os.walk(cls.dir):
+            for f in files:
+                if f == "index.html" and root != cls.dir:
+                    cls.html[os.path.relpath(root, cls.dir).replace(os.sep, "/") + "/"] = open(os.path.join(root, f), encoding="utf-8").read()
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        shutil.rmtree(cls.dir)
+
+    def test_carson_page(self):
+        page = self.html["schools/carson-middle-herndon/"]
+        self.assertIn("<h1>Data centers near Rachel Carson Middle School</h1>", page)
+        self.assertIn("<b>4 data centers</b> within 2 miles: 2 planned, 2 operating", page)
+        self.assertIn('href="../../#school=510126001756&amp;r=2"', page)
+
+    def test_every_page_has_one_title_h1_canonical_and_is_in_the_sitemap(self):
+        sitemap = open(os.path.join(self.dir, "sitemap.xml"), encoding="utf-8").read()
+        for path, page in self.html.items():
+            self.assertEqual(page.count("<h1>"), 1, path)
+            self.assertIn(f'<link rel="canonical" href="{self.cfg["site_url"]}/{path}">', page)
+            self.assertIn(f"<loc>{self.cfg['site_url']}/{path}</loc>", sitemap, path)
+        self.assertEqual(sitemap.count("<loc>"), self.counts["total"] + 1)  # + the map itself
+
+    def test_internal_links_resolve(self):
+        for path, page in self.html.items():
+            for href in self.re.findall(r'href="([^"]+)"', page):
+                if href.startswith(("http", "#", "mailto:")):
+                    continue
+                target = os.path.normpath(os.path.join(self.dir, path, href.split("#")[0]))
+                self.assertTrue(os.path.exists(target), f"{path}: broken link {href}")
+
+    def test_support_link_hidden_until_configured(self):
+        if not self.cfg.get("support_url"):
+            self.assertNotIn(self.cfg["support_label"], self.html["about/"])
+
+
 if __name__ == "__main__":
     unittest.main()

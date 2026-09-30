@@ -58,6 +58,11 @@ Census ZIP centers ──────────┘
 - `build.py` joins the sources, assigns each site's locality by point-in-polygon, attaches permit dates, and
   **refuses to publish** if the data looks broken: too few sites, a drop of more than 25% since the last build,
   points outside Virginia, sites with no locality, or too few schools or ZIP codes.
+- `pipeline/pages.py` generates a static page for every county or city, ZIP code (data center within 5 miles)
+  and public school (within 2 miles) with a data center nearby, plus Browse, About and Privacy pages and a
+  sitemap, so search engines and link previews can read the content. Leading with the name people use: "Rachel
+  Carson Middle School" rather than the federal "Carson Middle". Site settings (address, the hidden donate link)
+  live in `data/site_config.json`.
 - `site/geo.js` holds the search logic (distances, radius, school name matching, shareable links), shared by the
   page and the tests.
 - **GitHub Actions** rebuilds from the live sources every morning, runs the tests, commits the data only when it

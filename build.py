@@ -24,17 +24,22 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "pipeline"))
 import geo  # noqa: E402
+import pages  # noqa: E402
 import sources  # noqa: E402
 
 OUT = os.path.join(HERE, "site", "data")
 CACHE = os.path.join(HERE, ".cache")
 PERMIT_SNAPSHOTS = sorted(glob.glob(os.path.join(HERE, "data", "deq_issued_permits_*.tsv")))
 ALIASES = os.path.join(HERE, "data", "landmark_aliases.json")
+SITE_CONFIG = os.path.join(HERE, "data", "site_config.json")
 
 # DEQ operating status -> the map's stage. Order matters: it's the lifecycle order used for sorting and legends.
 STAGES = {"Planned": "planned", "Under Construction": "construction", "Operating": "operating",
           "Temporarily Shutdown": "shutdown"}
 VA_BBOX = (36.5, 39.5, -83.7, -75.2)  # lat min, lat max, lon min, lon max
+
+
+CONFIG = json.load(open(SITE_CONFIG, encoding="utf-8"))
 
 
 def cached(name, fetch, offline):
@@ -142,6 +147,9 @@ def build(offline=False):
         "schools": len(schools),
         "zips": len(zips),
         "deq_disclaimer": disclaimer,
+        # Site settings the page needs (the donate link stays hidden while support_url is null).
+        "support_url": CONFIG.get("support_url"),
+        "support_label": CONFIG.get("support_label"),
         "sources": {
             "deq_air_sites": f"{sources.DEQ}/{sources.DEQ_AIR_SITES}",
             "deq_permit_page": "https://www.deq.virginia.gov/news-info/shortcuts/permits/air/issued-air-permits-for-data-centers",
@@ -195,6 +203,9 @@ if __name__ == "__main__":
     args = ap.parse_args()
     fac, sch, zp, meta = build(offline=args.offline)
     write(fac, sch, zp, meta)
+    counts = pages.build_pages(os.path.join(HERE, "site"), fac, sch, zp, meta, CONFIG)
+    print(f"pages: {counts['localities']} counties/cities, {counts['zips']} ZIP codes, {counts['schools']} schools "
+          f"({counts['total']} total) + sitemap")
     print(f"{meta['facilities']} data centers {meta['stages']}; {meta['schools']} schools; {meta['zips']} ZIPs; "
           f"permit snapshot {meta['permit_snapshot']} ({meta['permits_in_snapshot']} permits, "
           f"{meta['facilities_without_permit_row']} facilities not on the list yet)")
