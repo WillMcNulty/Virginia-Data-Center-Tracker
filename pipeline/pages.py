@@ -127,6 +127,9 @@ def shell(path, title, description, body, cfg, state="virginia", card=None):
         <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a></div>
     </div>
   </footer>
+<!-- Cloudflare Web Analytics -->
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{{"token": "a6c6e47a18a143f28f11aff1ab47154b"}}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>
 """
@@ -446,24 +449,29 @@ def privacy_page(ctx):
     body = f"""    <h1>Privacy policy</h1>
     <p class="note">Last updated {fmt_date(dt.date.today().isoformat())}.</p>
     <h2>What this site collects</h2>
-    <p>Nothing about you. There are no accounts, forms that send data, cookies, analytics or ads. Searches by ZIP
-      code, school or map pin run entirely in your browser; nothing you enter is sent to this site or anyone else. A
+    <p>There are no visitor accounts, advertising cookies or ads. Searches by ZIP
+      code, school or map pin and distance calculations run in your browser. A
       search you share as a link keeps its details after the <code>#</code> in the address, which browsers don't send
       to servers.</p>
     <h2>What your browser stores</h2>
     <p>If you pick a color theme, that choice is saved in your browser's local storage so it's remembered next time.
       It never leaves your device. Clearing your browser's site data removes it.</p>
     <h2>Other services the page contacts</h2>
+    <p>We use <a href="https://developers.cloudflare.com/web-analytics/">Cloudflare Web Analytics</a>
+      to understand visits, page views, referring sites and page performance. Its script sends usage and
+      performance information to Cloudflare. Cloudflare says it does not use cookies or browser storage for
+      this analytics service or track individuals across websites. Reports can include page paths, country,
+      browser and device type. We do not add search-event or map-pin tracking.</p>
     <p>Map images come from <a href="https://openfreemap.org/">OpenFreeMap</a>, which therefore sees which area of the
       map is being viewed (like any map image server). The site is served by its host, which, like any web server,
       receives standard request information such as your IP address; this project doesn't collect or use it.</p>
     <h2>Changes</h2>
-    <p>If this site ever adds analytics, email alerts, ads or donations, this page will be updated first to say
+    <p>If this site changes its analytics or adds email alerts, ads or donations, this page will be updated first to say
       exactly what is collected and by whom, with any choices you have.</p>
     <h2>Contact</h2>
     <p><a href="{e(cfg['contact_url'])}">Contact the author</a>.</p>"""
     write(ctx, "privacy/", shell("privacy/", "Privacy policy · Data Centers Near You",
-                                 "What Data Centers Near You collects (nothing about you) and what your browser stores.", body, cfg))
+                                 "How Data Centers Near You uses cookieless analytics and what your browser stores.", body, cfg))
 
 
 def legacy_redirects(ctx, pairs):

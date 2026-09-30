@@ -36,10 +36,13 @@ every source and its limits.
 
 ## Privacy
 
-- **Searches never leave the browser.** ZIP centers, schools and data centers ship with the page; the distance math
+- **Searches run in the browser.** ZIP centers, schools and data centers ship with the page; the distance math
   runs locally. There's no address box and no geocoding service.
 - **Shareable links** keep the search in the URL fragment (`#school=...&r=1`), which browsers don't send to servers.
-- **No analytics, cookies or trackers.** The map library is served from this site. The one outside request is for
+- **Cookieless analytics.** Cloudflare Web Analytics reports visits, page views, referrals and performance.
+  We do not add search-event or map-pin tracking. See the site's Privacy page for details.
+  The public beacon token is in `pipeline/pages.py` (generated pages) and `site/virginia/index.html` (map).
+  Update both if replacing it. The map library is served from this site. External requests also fetch
   map tiles, from [OpenFreeMap](https://openfreemap.org/), which therefore sees which area of the map is being viewed.
 
 ## How it works

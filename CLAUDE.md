@@ -17,7 +17,9 @@ The task backlog for parallel work is **`docs/BACKLOG.md`** in this repo.
 - **Neutral and procedural.** The site informs; it never argues for or against data centers or tells people what
   to think or whom to vote for.
 - **No personal data:** no landowner names from filings, no county staff names/emails (LOLA's AssignedTo fields
-  are deliberately not fetched), nothing collected about visitors. Searches run in the browser.
+  are deliberately not fetched). Searches run in the browser. Owner-authorized Cloudflare Web Analytics
+  provides cookieless usage/performance reports; do not add search-event or map-pin tracking. Keep the
+  privacy page accurate. The public beacon token appears in pages.py and the map index.html.
 - **Don't scrape pages that block bots.** DEQ's issued-permits web page (Akamai 403) is updated by hand as a dated
   snapshot in `data/`. Use official APIs/ArcGIS REST services.
 - **Critical infrastructure:** don't publish precise fiber routes or combine detailed infrastructure layers into a
