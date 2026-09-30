@@ -62,6 +62,15 @@ h2 { font: 800 12.5px var(--sans); letter-spacing: 0.08em; text-transform: upper
 .dot.shutdown, .dot.other { background: var(--st-shutdown); }
 .tag { display: inline-block; font: 700 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--blue-tint); color: var(--navy); }
 .tag.planned, .tag.construction { background: var(--orange-tint); color: var(--ink); }
+.plain { padding-left: 20px; }
+.plain li { margin: 4px 0; }
+.when { color: var(--ink-2); font-size: 13px; }
+a.nm { color: var(--ink); text-decoration: none; }
+a.nm:hover { color: var(--orange); text-decoration: underline; }
+.zipform { margin: 18px 0 8px; }
+.zipform label { display: block; font-weight: 600; margin-bottom: 6px; }
+.zipform div { display: flex; gap: 8px; }
+.zipform input { font: inherit; font-size: 17px; padding: 9px 12px; border: 1px solid var(--axis); border-radius: 6px; width: 160px; background: var(--surface); color: var(--ink); }
 .idx { list-style: none; padding: 0; margin: 0; columns: 2 260px; column-gap: 28px; }
 .idx li { break-inside: avoid; padding: 3px 0; font-size: 15px; }
 .idx span { color: var(--ink-2); font-size: 13px; }

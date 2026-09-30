@@ -47,7 +47,7 @@ every source and its limits.
 ```
 DEQ Air Sites layer (daily) ─┐
 DEQ county boundaries ───────┤
-DEQ permit list (snapshot) ──┼─> build.py ─> checks ─> site/data/*.json ─> static page (MapLibre + OpenFreeMap)
+DEQ permit list (snapshot) ──┼─> build.py ─> checks ─> site/virginia/data/*.json ─> static page (MapLibre + OpenFreeMap)
 NCES school locations ───────┤
 Census ZIP centers ──────────┘
 ```
@@ -63,6 +63,14 @@ Census ZIP centers ──────────┘
   sitemap, so search engines and link previews can read the content. Leading with the name people use: "Rachel
   Carson Middle School" rather than the federal "Carson Middle". Site settings (address, the hidden donate link)
   live in `data/site_config.json`.
+- **Layout for more states** (the site becomes Data Centers Near You at `datacentersnearyou.org`): a national front
+  page at `/`, and everything Virginia under `/virginia/`: the map, its data (`site/virginia/data/`), and the
+  generated pages, including **one page per data center** (`/virginia/data-centers/<id>-<name>/`, with nearby
+  schools and neighboring sites). The first version's addresses forward to the new ones.
+- `pipeline/changes.py` keeps a **change log** (`site/virginia/data/changes.json`, committed): each daily build
+  compares DEQ's records with the previous day's and records new sites, stage changes, new permits, renames and
+  removals. It feeds `/virginia/new/` ("New this week") and an RSS feed. Offline rebuilds, which use cached data,
+  never add to it.
 - `site/geo.js` holds the search logic (distances, radius, school name matching, shareable links), shared by the
   page and the tests.
 - **GitHub Actions** rebuilds from the live sources every morning, runs the tests, commits the data only when it

@@ -37,13 +37,14 @@ jobs:
       - name: Commit refreshed data if the data changed
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
-          # meta.json's build time changes every run; only commit when the data itself changed.
-          if git diff --quiet -- site/data/facilities.json site/data/schools.json site/data/zips.json; then
+          # meta.json's build time changes every run; only commit when the data itself changed
+          # (changes.json, the change log, only changes when facilities.json does).
+          if git diff --quiet -- site/virginia/data/facilities.json site/virginia/data/schools.json site/virginia/data/zips.json; then
             echo "No data changes."
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add site/data
+            git add site/virginia/data
             git commit -m "Refresh data from DEQ ($(date -u +%F))"
             git push
           fi

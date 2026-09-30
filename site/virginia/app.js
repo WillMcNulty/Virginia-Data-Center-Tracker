@@ -1,8 +1,8 @@
 // Virginia Data Center Tracker: map and search. Plain DOM, MapLibre served from this site (vendor/), data from
 // data/*.json built by build.py. Searches never leave the browser; the URL fragment (#zip=..., #school=...,
 // #pin=...) keeps a search shareable without sending it to any server.
-import { Map as MLMap, NavigationControl, Popup } from "./vendor/maplibre-gl.mjs";
-import { miles, within, circle, searchSchools, parseHash } from "./geo.js";
+import { Map as MLMap, NavigationControl, Popup } from "../vendor/maplibre-gl.mjs";
+import { miles, within, circle, searchSchools, parseHash } from "../geo.js";
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, attrs = {}, text) => {

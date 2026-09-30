@@ -1,13 +1,13 @@
 """Build the site's data files from the public sources.
 
-    python build.py            fetch everything live and write site/data/*.json
+    python build.py            fetch everything live and write site/virginia/data/*.json
     python build.py --offline  rebuild from the cached raw files in .cache/ (for working without network)
 
 Writes:
-  site/data/facilities.json  every DEQ-flagged data center: location, stage, locality, permits
-  site/data/schools.json     Virginia public schools (landmark search)
-  site/data/zips.json        Virginia ZIP code center points (ZIP search)
-  site/data/meta.json        counts, build time, sources, DEQ's data disclaimer
+  site/virginia/data/facilities.json  every DEQ-flagged data center: location, stage, locality, permits
+  site/virginia/data/schools.json     Virginia public schools (landmark search)
+  site/virginia/data/zips.json        Virginia ZIP code center points (ZIP search)
+  site/virginia/data/meta.json        counts, build time, sources, DEQ's data disclaimer
 
 Refuses to write anything if the data looks broken (see check()), so a source outage can't publish an empty map.
 """
@@ -23,11 +23,14 @@ from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "pipeline"))
+import changes  # noqa: E402
 import geo  # noqa: E402
 import pages  # noqa: E402
 import sources  # noqa: E402
 
-OUT = os.path.join(HERE, "site", "data")
+SITE = os.path.join(HERE, "site")
+STATE = "virginia"  # this build's state; its map, data and pages live under site/virginia/
+OUT = os.path.join(SITE, STATE, "data")
 CACHE = os.path.join(HERE, ".cache")
 PERMIT_SNAPSHOTS = sorted(glob.glob(os.path.join(HERE, "data", "deq_issued_permits_*.tsv")))
 ALIASES = os.path.join(HERE, "data", "landmark_aliases.json")
@@ -202,10 +205,20 @@ if __name__ == "__main__":
     ap.add_argument("--offline", action="store_true")
     args = ap.parse_args()
     fac, sch, zp, meta = build(offline=args.offline)
+    # Change log: compare with the facility list already committed, before overwriting it.
+    prev_path = os.path.join(OUT, "facilities.json")
+    before = json.load(open(prev_path, encoding="utf-8")) if os.path.exists(prev_path) else None
+    # Offline builds use cached (possibly days-old) source data, so they never add to the change log.
+    log, added = changes.update(os.path.join(OUT, "changes.json"), None if args.offline else before, fac,
+                                dt.date.today().isoformat())
     write(fac, sch, zp, meta)
-    counts = pages.build_pages(os.path.join(HERE, "site"), fac, sch, zp, meta, CONFIG)
-    print(f"pages: {counts['localities']} counties/cities, {counts['zips']} ZIP codes, {counts['schools']} schools "
-          f"({counts['total']} total) + sitemap")
+    with open(os.path.join(OUT, "changes.json"), "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(log, fh, ensure_ascii=False, indent=1)
+        fh.write("\n")
+    print(f"change log: {len(added)} new event(s) today; {len(log['events'])} since {log['since']}")
+    counts = pages.build_pages(SITE, STATE, fac, sch, zp, meta, log, CONFIG)
+    print(f"pages: {counts['localities']} counties/cities, {counts['zips']} ZIP codes, {counts['schools']} schools, "
+          f"{counts['facilities']} data centers ({counts['total']} total) + sitemap, RSS")
     print(f"{meta['facilities']} data centers {meta['stages']}; {meta['schools']} schools; {meta['zips']} ZIPs; "
           f"permit snapshot {meta['permit_snapshot']} ({meta['permits_in_snapshot']} permits, "
           f"{meta['facilities_without_permit_row']} facilities not on the list yet)")

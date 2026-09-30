@@ -1,0 +1,15 @@
+{
+ "since": "2026-09-28",
+ "events": [
+  {
+   "date": "2026-09-30",
+   "type": "stage",
+   "id": 74290,
+   "name": "CyrusOne – NVA14",
+   "locality": "Loudoun County",
+   "stage": "operating",
+   "from": "planned",
+   "to": "operating"
+  }
+ ]
+}

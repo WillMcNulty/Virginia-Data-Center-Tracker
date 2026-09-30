@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Virginia Data Center Tracker</title>
+<title>Virginia data centers near you: map · Data Centers Near You</title>
 <meta name="description" content="Every data center Virginia's Department of Environmental Quality knows about, on a map: planned, under construction and operating. Search by ZIP code, school or a pin on the map.">
 <meta name="theme-color" content="#232d4b">
-<link rel="stylesheet" href="vendor/maplibre-gl.css">
-<script src="theme.js"></script>
+<link rel="stylesheet" href="../vendor/maplibre-gl.css">
+<script src="../theme.js"></script>
 <style>
   /* Same design language as willmcnulty.github.io and the UVA Capital Plan Tracker. Map marker colors were checked
      for colorblind separation (every pair, since any two points can sit side by side) against the basemap
@@ -145,10 +145,11 @@
 <body>
   <header class="topbar band">
     <div class="wrap">
-      <strong>Virginia Data Center Tracker</strong>
+      <strong><a href="../" style="color:inherit;text-decoration:none">Data Centers Near You</a> · Virginia</strong>
       <nav aria-label="Links">
+        <a href="new/">New this week</a>
         <a href="browse/">Browse</a>
-        <a href="about/">About</a>
+        <a href="../about/">About</a>
         <a id="support-link" href="#" hidden></a>
         <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a>
         <a href="https://willmcnulty.github.io/">By William McNulty</a>
@@ -261,7 +262,7 @@
   <footer class="band">
     <div class="wrap" id="footer">
       <div>Independent project; not affiliated with Virginia DEQ, any locality, or any company shown.</div>
-      <div>Data last refreshed <span id="built"></span>. <a href="browse/">Browse by county, ZIP code or school</a> · <a href="privacy/">Privacy</a> · <a href="about/">About</a></div>
+      <div>Data last refreshed <span id="built"></span>. <a href="new/">New this week</a> · <a href="browse/">Browse by county, ZIP code or school</a> · <a href="../privacy/">Privacy</a> · <a href="../about/">About</a></div>
       <div> <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code and data on GitHub</a> · <a href="https://willmcnulty.github.io/">More projects by William McNulty</a></div>
     </div>
   </footer>

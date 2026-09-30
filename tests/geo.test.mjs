@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { miles, within, circle, searchSchools, parseHash } from "../site/geo.js";
 
-const load = (n) => JSON.parse(readFileSync(new URL(`../site/data/${n}.json`, import.meta.url), "utf8"));
+const load = (n) => JSON.parse(readFileSync(new URL(`../site/virginia/data/${n}.json`, import.meta.url), "utf8"));
 const facilities = load("facilities"), schools = load("schools"), zips = load("zips");
 let failed = 0;
 const check = (name, ok, detail = "") => { console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  " + detail : ""}`); if (!ok) failed++; };
