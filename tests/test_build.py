@@ -155,6 +155,27 @@ class GeneratedPages(unittest.TestCase):
         self.assertIn("<b>4 data centers</b> within 2 miles: 2 planned, 2 operating", page)
         self.assertIn('href="../../../virginia/#school=510126001756&amp;r=2"', page)
 
+    def test_analytics_on_map_and_generated_pages_only_once(self):
+        from html.parser import HTMLParser
+        class Scripts(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.beacons = []
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "script" and attrs.get("src") == "https://static.cloudflareinsights.com/beacon.min.js":
+                    self.beacons.append(attrs)
+        for path, html in self.html.items():
+            parser = Scripts()
+            parser.feed(html)
+            with self.subTest(path=path):
+                self.assertEqual(len(parser.beacons), 0 if path in self.forwarders else 1)
+                if parser.beacons:
+                    self.assertEqual(json.loads(parser.beacons[0]["data-cf-beacon"])["token"],
+                                     "a6c6e47a18a143f28f11aff1ab47154b")
+        self.assertIn("Cloudflare Web Analytics", self.html["privacy/"])
+        self.assertNotIn("Nothing about you", self.html["privacy/"])
+
     def test_old_carson_address_forwards_to_the_new_one(self):
         self.assertIn("url=../../virginia/schools/rachel-carson-middle-school-herndon/",
                       self.html["schools/carson-middle-herndon/"])
