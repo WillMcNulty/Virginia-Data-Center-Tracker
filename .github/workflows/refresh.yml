@@ -28,6 +28,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install Pillow (draws the link-preview images; the build refuses to run in CI without it)
+        run: python -m pip install "Pillow>=11,<13"
       - name: Rebuild from the live sources (stops if a source looks broken)
         run: python build.py
       - name: Python tests

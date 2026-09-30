@@ -195,6 +195,158 @@ class GeneratedPages(unittest.TestCase):
         if not self.cfg.get("support_url"):
             self.assertNotIn(self.cfg["support_label"], self.html["about/"])
 
+    def test_every_page_has_a_preview_image(self):
+        import cards
+        base = self.cfg["site_url"].rstrip("/") + "/"
+        own = 0
+        for path, page in self.pages.items():
+            url = self.re.search(r'<meta property="og:image" content="([^"]+)">', page).group(1)
+            self.assertTrue(url.startswith(base), f"{path}: og:image must be absolute: {url}")
+            self.assertIn('<meta property="og:image:width" content="1200">', page, path)
+            self.assertIn('<meta property="og:image:height" content="630">', page, path)
+            self.assertRegex(page, r'<meta property="og:image:alt" content="[^"]{20,}">', path)
+            self.assertIn('<meta name="twitter:card" content="summary_large_image">', page, path)
+            rel = url[len(base):]
+            if rel == cards.DEFAULT_CARD:
+                file = os.path.join(ROOT, "site", rel)  # the committed generic card
+            else:
+                own += 1
+                file = os.path.join(self.dir, rel)
+            self.assertEqual(png_info(file)[:2], (1200, 630), f"{path}: {rel}")
+        if cards.available():
+            # every data page (county, ZIP, school, data center) and the front door has its own card
+            self.assertEqual(own, sum(self.counts[k] for k in ("localities", "zips", "schools", "facilities")) + 1)
+            self.assertEqual(self.counts["cards"]["cards"], own)
+        else:
+            self.assertEqual(own, 0)
+
+    def test_carson_card(self):
+        import cards
+        page = self.html["virginia/schools/rachel-carson-middle-school-herndon/"]
+        self.assertIn('content="4 data centers within 1 mile of Rachel Carson Middle School. Herndon, Virginia. '
+                      'On Virginia DEQ records: 2 planned, 2 operating."', page)
+        if cards.available():
+            self.assertIn(f'content="{self.cfg["site_url"]}/cards/virginia/schools/rachel-carson-middle-school-herndon.png"', page)
+
+    def test_cards_are_small_palette_pngs(self):
+        import cards
+        if not cards.available():
+            self.skipTest("Pillow not installed")
+        files = [os.path.join(r, f) for r, _, fs in os.walk(os.path.join(self.dir, "cards")) for f in fs]
+        self.assertEqual(len(files), self.counts["cards"]["cards"])
+        sizes = [os.path.getsize(f) for f in files]
+        self.assertLess(max(sizes), 30_000)  # about 15 KB each in Sept 2026
+        self.assertLess(sum(sizes) / len(sizes), 20_000)
+        for f in files[:25]:
+            self.assertEqual(png_info(f), (1200, 630, 3), f)  # color type 3: palette
+
+
+class Cards(unittest.TestCase):
+    """Link-preview images (pipeline/cards.py)."""
+
+    def setUp(self):
+        import cards
+        self.cards = cards
+
+    def test_committed_default_card(self):
+        path = os.path.join(ROOT, "site", self.cards.DEFAULT_CARD)
+        self.assertEqual(png_info(path), (1200, 630, 3))
+        self.assertLess(os.path.getsize(path), 30_000)
+
+    def test_card_paths(self):
+        self.assertEqual(self.cards.card_file(""), "cards/home.png")
+        self.assertEqual(self.cards.card_file("virginia/zip/20171/"), "cards/virginia/zip/20171.png")
+
+    def test_link_and_instagram_cards(self):
+        import tempfile
+        if not self.cards.available():
+            self.skipTest("Pillow not installed")
+        d = tempfile.mkdtemp()
+        link = self.cards.render("4 data centers within 1 mile of Rachel Carson Middle School",
+                                 "Herndon, Virginia. On Virginia DEQ records: 2 planned, 2 operating.", footer="example.org")
+        insta = self.cards.instagram_card("4 data centers within 1 mile of Rachel Carson Middle School",
+                                          "Herndon, Virginia. On Virginia DEQ records: 2 planned, 2 operating.")
+        self.assertEqual((link.size, insta.size), ((1200, 630), (1080, 1350)))
+        for name, img, dims in (("link", link, (1200, 630)), ("insta", insta, (1080, 1350))):
+            path = os.path.join(d, f"{name}.png")
+            n = self.cards.save(img, path)
+            self.assertEqual(png_info(path), dims + (3,))
+            self.assertLess(n, 40_000)
+            self.assertEqual(n, os.path.getsize(path))
+        # images with other colors: adaptive palette
+        self.assertGreater(self.cards.save(link, os.path.join(d, "adaptive.png"), colors=8), 0)
+
+    def test_long_headlines_wrap_and_shrink_to_fit(self):
+        if not self.cards.available():
+            self.skipTest("Pillow not installed")
+        c = self.cards
+        long_name = ("2 data centers within 2 miles of Thomas Jefferson High School for Science and Technology "
+                     "Regional Governor's School Academy of the Arts and Sciences Annex")
+        size, lines, line_h = c.fit(long_name, c.FONT_BOLD, 1000, 260, 72, 38, 4)
+        self.assertLess(size, 72)  # shrank
+        self.assertLessEqual(len(lines), 4)
+        self.assertLessEqual(len(lines) * line_h, 260)
+        font = c._font(c.FONT_BOLD, size)
+        for line in lines:
+            self.assertLessEqual(font.getlength(line), 1000, line)
+        # an unbreakable run of characters is split, never drawn past the edge
+        for line in c.wrap("X" * 200, c._font(c.FONT_BOLD, 60), 1000):
+            self.assertLessEqual(c._font(c.FONT_BOLD, 60).getlength(line), 1000)
+        # far too much text: cut with an ellipsis at the smallest size
+        size, lines, line_h = c.fit("word " * 400, c.FONT_BOLD, 1000, 260, 72, 38, 4)
+        self.assertEqual(size, 38)
+        self.assertTrue(lines[-1].endswith("…"))
+        self.assertLessEqual(len(lines) * line_h, 260)
+        c.render(long_name * 3, long_name * 3, footer="example.org")  # draws without error
+
+    def test_without_pillow_pages_use_the_default_card(self):
+        import tempfile
+        from unittest import mock
+        import pages
+        cfg = {"site_url": "https://example.org/x", "contact_url": "https://example.org/c"}
+        d = tempfile.mkdtemp()
+        with mock.patch.object(self.cards, "Image", None), mock.patch.dict(os.environ):
+            os.environ.pop("CI", None)
+            self.assertFalse(self.cards.available())
+            self.cards.reset()
+            page = pages.shell("virginia/zip/20171/", "t", "d", "<h1>x</h1>", cfg,
+                               card={"headline": "3 data centers within 5 miles of ZIP code 20171"})
+            self.assertIn('<meta property="og:image" content="https://example.org/x/card-default.png">', page)
+            self.assertIn('<meta name="twitter:card" content="summary_large_image">', page)
+            stats = self.cards.render_queued(d)
+            self.assertEqual((stats["cards"], stats["skipped"]), (0, 1))
+            self.assertFalse(os.path.exists(os.path.join(d, "cards")))
+            # in CI (GitHub sets CI=true), a missing Pillow stops the build instead
+            os.environ["CI"] = "true"
+            with self.assertRaises(SystemExit):
+                self.cards.render_queued(d)
+
+    def test_with_pillow_a_page_points_to_its_own_card(self):
+        import tempfile
+        import pages
+        if not self.cards.available():
+            self.skipTest("Pillow not installed")
+        cfg = {"site_url": "https://example.org/x/", "contact_url": "https://example.org/c"}
+        d = tempfile.mkdtemp()
+        self.cards.reset()
+        page = pages.shell("virginia/zip/20171/", "t", "d", "<h1>x</h1>", cfg,
+                           card={"headline": "3 data centers within 5 miles of ZIP code 20171", "sub": "Stage & more"})
+        self.assertIn('<meta property="og:image" content="https://example.org/x/cards/virginia/zip/20171.png">', page)
+        self.assertIn('content="3 data centers within 5 miles of ZIP code 20171. Stage &amp; more"', page)
+        stats = self.cards.render_queued(d)
+        self.assertEqual(stats["cards"], 1)
+        self.assertEqual(png_info(os.path.join(d, "cards", "virginia", "zip", "20171.png")), (1200, 630, 3))
+
+
+def png_info(path):
+    """(width, height, color type) from a PNG's header, without Pillow."""
+    import struct
+    with open(path, "rb") as fh:
+        head = fh.read(26)
+    assert head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR", path
+    w, h = struct.unpack(">II", head[16:24])
+    return w, h, head[25]
+
 
 def html_escape(s):
     import html

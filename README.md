@@ -71,6 +71,11 @@ Census ZIP centers ──────────┘
   compares DEQ's records with the previous day's and records new sites, stage changes, new permits, renames and
   removals. It feeds `/virginia/new/` ("New this week") and an RSS feed. Offline rebuilds, which use cached data,
   never add to it.
+- `pipeline/cards.py` draws each generated page's **link-preview image** (1200x630, `og:image`): the page's own
+  numbers as a headline, e.g. "4 data centers within 1 mile of Rachel Carson Middle School", in DejaVu Sans
+  (bundled in `pipeline/fonts/`), saved as a small palette PNG (about 15 KB) under `site/cards/` (generated). It
+  also draws a 1080x1350 Instagram variant on request. Needs Pillow: CI installs it and refuses to build without
+  it; a local build without it skips the images and points every page to the committed `site/card-default.png`.
 - `site/geo.js` holds the search logic (distances, radius, school name matching, shareable links), shared by the
   page and the tests.
 - **GitHub Actions** rebuilds from the live sources every morning, runs the tests, commits the data only when it
@@ -89,7 +94,8 @@ mile, that "Rachel Carson", "rachel carson middle school" and "Carson" all find 
 
 ## Run it locally
 
-Python 3.10+ (standard library only) and Node 18+ for the search tests.
+Python 3.10+ (standard library, plus Pillow for the link-preview images: `pip install Pillow`; optional locally)
+and Node 18+ for the search tests.
 
 ```bash
 python build.py                                   # fetch live data (about 40 seconds)

@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 
+import cards
 import geo
 
 STAGE_LABEL = {"planned": "Planned", "construction": "Under construction", "operating": "Operating",
@@ -78,7 +79,8 @@ def school_display(s):
 
 # ---- page shell ---------------------------------------------------------------------------------------------------
 
-def shell(path, title, description, body, cfg, state="virginia"):
+def shell(path, title, description, body, cfg, state="virginia", card=None):
+    """card: {"headline", "sub"} for the page's link-preview image (see cards.py); None uses the generic card."""
     up = "../" * path.count("/")
     canonical = f"{cfg['site_url'].rstrip('/')}/{path}"
     support = (f'<a href="{e(cfg["support_url"])}">{e(cfg.get("support_label") or "Support this project")}</a>'
@@ -96,7 +98,7 @@ def shell(path, title, description, body, cfg, state="virginia"):
 <meta property="og:description" content="{e(description)}">
 <meta property="og:url" content="{e(canonical)}">
 <meta property="og:site_name" content="Data Centers Near You">
-<meta name="twitter:card" content="summary">
+{cards.meta_tags(cfg, path, card)}
 <meta name="theme-color" content="#232d4b">
 <link rel="stylesheet" href="{up}pages.css">
 <script src="{up}theme.js"></script>
@@ -171,7 +173,9 @@ def locality_pages(ctx):
 {facility_list(items, up, s, with_distance=False)}
     <p class="note">Stages are DEQ's own. Only sites that have applied for a DEQ air permit for backup generators
       appear; earlier-stage proposals filed with the county are not included yet.</p>"""
-        write(ctx, path, shell(path, title, desc, body, cfg))
+        card = {"headline": f"{plural(len(items), 'data center')} in {loc}, {STATE_NAME[s]}",
+                "sub": f"On Virginia DEQ records: {stage_summary(items)}."}
+        write(ctx, path, shell(path, title, desc, body, cfg, card=card))
         index.append((loc, path, len(items), n_future))
     return index
 
@@ -198,7 +202,9 @@ def zip_pages(ctx):
 {facility_list(items, up, s)}
     <p class="note">Distances are straight-line from the ZIP code's center point (Census). For a precise spot, use a
       school or drop a pin on the map.</p>"""
-        write(ctx, path, shell(path, title, desc, body, cfg))
+        card = {"headline": f"{plural(len(items), 'data center')} within {ZIP_RADIUS} miles of ZIP code {z}",
+                "sub": f"On Virginia DEQ records: {stage_summary(items)}. {within1} within 1 mile, {within3} within 3 miles."}
+        write(ctx, path, shell(path, title, desc, body, cfg, card=card))
         index.append((z, path, len(items), within1))
     return index
 
@@ -236,7 +242,14 @@ def school_pages(ctx):
     <p class="note">Straight-line distance from the school's location (National Center for Education Statistics).
       Virginia's 2026 siting law requires a sound study covering schools within 500 feet of a new high-energy
       facility before a county can approve it.</p>"""
-        write(ctx, path, shell(path, title, desc, body, cfg))
+        if within1 in (0, len(items)):  # all of them within 1 mile, or none: one number says it
+            headline = f"{plural(len(items), 'data center')} within {plural(1 if within1 else SCHOOL_RADIUS, 'mile')} of {display}"
+            detail = stage_summary(items)
+        else:
+            headline = f"{plural(within1, 'data center')} within 1 mile of {display}"
+            detail = f"{plural(len(items), 'data center')} within {SCHOOL_RADIUS} miles ({stage_summary(items)})"
+        card = {"headline": headline, "sub": f"{sc['city']}, {STATE_NAME[s]}. On Virginia DEQ records: {detail}."}
+        write(ctx, path, shell(path, title, desc, body, cfg, card=card))
         index.append((f"{display} ({sc['city']})", path, len(items), within1))
     return index
 
@@ -277,7 +290,11 @@ def facility_pages(ctx):
     <h2>Source</h2>
     <p><a href="{DEQ_RECORD.format(f['id'])}">DEQ Air Sites record {f['id']}</a> (permit class: {e(f.get('permit_class') or 'not given')}).
       The stage is DEQ's own. This page is rebuilt every morning from DEQ's records.</p>"""
-        write(ctx, path, shell(path, title, desc, body, cfg))
+        card = {"headline": f["name"],
+                "sub": f"{f['locality']}, {STATE_NAME[s]}. Stage on Virginia DEQ records: {STAGE_LABEL[f['stage']].lower()}. "
+                       f"{plural(len(schools), 'school')} within {SCHOOL_RADIUS} miles; "
+                       f"{plural(len(neighbors), 'other data center')} within {NEIGHBOR_RADIUS} mile."}
+        write(ctx, path, shell(path, title, desc, body, cfg, card=card))
 
 
 EVENT_TEXT = {
@@ -389,7 +406,8 @@ def front_door(ctx):
     </script>"""
     write(ctx, "", shell("", "Data Centers Near You: data centers planned, being built and running near you",
                          "Search your ZIP code, school or neighborhood for data centers planned, under construction or operating, from state records.",
-                         body, cfg))
+                         body, cfg, card={"headline": f"{meta['facilities']} data centers on Virginia DEQ's records",
+                                          "sub": f"{planned} planned or under construction. Search by ZIP code or school."}))
 
 
 def about_page(ctx):
@@ -483,6 +501,7 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg):
         p = os.path.join(site_dir, state, name)
         if os.path.isdir(p):
             shutil.rmtree(p)
+    cards.reset()
     ctx = {"out": site_dir, "state": state, "facilities": facilities, "schools": schools, "zips": zips,
            "meta": meta, "log": log, "cfg": cfg, "urls": []}
     loc_idx = locality_pages(ctx)
@@ -510,5 +529,6 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg):
         fh.write("</urlset>\n")
     with open(os.path.join(site_dir, "robots.txt"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"User-agent: *\nAllow: /\nSitemap: {base}/sitemap.xml\n")
+    card_stats = cards.render_queued(site_dir)  # the link-preview images the pages above point to
     return {"localities": len(loc_idx), "zips": len(zip_idx), "schools": len(school_idx),
-            "facilities": len(facilities), "total": len(ctx["urls"])}
+            "facilities": len(facilities), "total": len(ctx["urls"]), "cards": card_stats}
