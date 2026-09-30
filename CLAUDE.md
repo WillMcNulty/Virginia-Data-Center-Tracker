@@ -32,6 +32,7 @@ pipeline/sources.py      source fetchers (ArcGIS REST, Census, NCES), standard l
 pipeline/geo.py          haversine miles, point-in-polygon (site/geo.js mirrors miles; tests check they agree)
 pipeline/pages.py        static pages: front door, /virginia/{places,zip,schools,data-centers,new,browse}, about,
                          privacy, sitemap, legacy forwarders (generated, gitignored)
+pipeline/cards.py        link-preview images (og:image) per page, Pillow; also the 1080x1350 Instagram variant
 pipeline/changes.py      change log (site/virginia/data/changes.json, committed) -> "New this week" + RSS
 pipeline/filings.py      county filings (Loudoun LOLA so far): NOT YET WIRED INTO build.py / the map (backlog T1)
 site/virginia/index.html + app.js   the map app (MapLibre from site/vendor, OpenFreeMap tiles)
