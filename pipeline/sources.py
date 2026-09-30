@@ -72,6 +72,19 @@ def nces_va_schools():
     return arcgis_query(NCES, "STATE='VA'", out_fields="NCESSCH,NAME,STREET,CITY,ZIP,LAT,LON", geometry=False)
 
 
+LOUDOUN_LOLA = "https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0"
+
+
+def loudoun_filings():
+    """Loudoun County land applications since 2005 that mention a data center (LOLA). Only the fields the site uses:
+    the staff-assignment fields (a reviewer's name and email) are deliberately not requested."""
+    where = ("PlanDescription LIKE '%data center%' OR PlanName LIKE '%data center%' "
+             "OR PlanDescription LIKE '%datacenter%' OR PlanName LIKE '%datacenter%'")
+    return arcgis_query(LOUDOUN_LOLA, where,
+                        out_fields="PlanNumber,PlanApplicationDate,PlanType,PlanStatus,PlanName,PlanDescription",
+                        extra={"maxAllowableOffset": 0.0001})
+
+
 def va_zip_centers():
     """{zip: (lat, lon)} for Virginia ZCTAs, from the Census Gazetteer (a delimited text file inside a zip)."""
     raw = get(GAZETTEER)
