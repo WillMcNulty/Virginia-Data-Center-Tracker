@@ -107,6 +107,17 @@ python -m http.server 8000 --directory site       # then open http://localhost:8
 
 `python build.py --offline` rebuilds from the raw files cached in `.cache/` by the last online build.
 
+## Weekly social drafts
+
+`python pipeline/social.py` drafts the week's posts for the owner to check and post by hand: Facebook and
+Bluesky text (each Bluesky post within 300 characters, link included) and an Instagram carousel (1080x1350 slides
+drawn with `pipeline/cards.py`, slide text with alt text, and a caption), written to `drafts/social/<date>/`
+(gitignored) with a README listing every number and the page to check it on. It reads only the committed data in
+`site/virginia/data/`: the last 7 days of the change log, or, in a week with no changes, a "look up your school"
+post with the current school numbers. It never posts anything and makes no network calls, and it isn't part of the
+daily build. `--date YYYY-MM-DD` drafts the week ending on another day; without Pillow the text drafts are still
+written.
+
 ## Updating the permit dates
 
 DEQ's issued-permits page can't be fetched by a script. To refresh it: open the page, show all rows, and save the
