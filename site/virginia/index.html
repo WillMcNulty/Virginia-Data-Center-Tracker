@@ -8,6 +8,37 @@
 <meta name="theme-color" content="#232d4b">
 <link rel="stylesheet" href="../vendor/maplibre-gl.css">
 <script src="../theme.js"></script>
+<script>
+  /* Embed mode, for newsrooms and other sites that frame the map. URL parameters (query string, before any #):
+       embed=1           map-only layout: no header, hero, numbers, info cards or footer; the map fills the frame
+                         with a compact search panel, a compact legend and a "Data Centers Near You" credit link
+                         (opens the full site in a new tab). Scroll-zoom needs Ctrl/Cmd (two fingers on touch) so
+                         the host page still scrolls past the map.
+       theme=light|dark  optional; without it the embed follows the reader's device (prefers-color-scheme), never
+                         a theme saved on the full site.
+     Search links work as on the full page, after the query string: ?embed=1#zip=20171&r=3, #school=<NCES id>,
+     #pin=<lat>,<lon>. Recommended snippet:
+       <iframe src="https://willmcnulty.github.io/Virginia-Data-Center-Tracker/virginia/?embed=1" width="100%"
+         height="500" style="border:0;max-width:960px" title="Map of Virginia data centers (Data Centers Near You)"
+         loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+     Runs before the stylesheet so the page never flashes the full layout or the wrong theme. */
+  (function () {
+    var q = new URLSearchParams(location.search), v = q.get("embed");
+    if (v === null || v === "0" || v === "false") return;
+    var root = document.documentElement, mq = matchMedia("(prefers-color-scheme: dark)");
+    var forced = q.get("theme") === "light" || q.get("theme") === "dark" ? q.get("theme") : null;
+    var savedAuto = !window.siteTheme || window.siteTheme.mode() === "auto";
+    root.classList.add("embed");
+    if (forced) root.setAttribute("data-theme", forced); else root.removeAttribute("data-theme");
+    function effective() { return forced || (mq.matches ? "dark" : "light"); }
+    // Replaces theme.js's handle for this page only; nothing is saved, so the full site keeps the reader's choice.
+    window.siteTheme = { mode: function () { return forced || "auto"; }, effective: effective, set: function () {} };
+    // theme.js already announces device changes when its saved mode is Auto; otherwise announce them here.
+    if (!forced && !savedAuto) mq.addEventListener("change", function () {
+      window.dispatchEvent(new CustomEvent("themechange", { detail: effective() }));
+    });
+  })();
+</script>
 <style>
   /* Same design language as willmcnulty.github.io and the UVA Capital Plan Tracker. Map marker colors were checked
      for colorblind separation (every pair, since any two points can sit side by side) against the basemap
@@ -152,6 +183,36 @@
   footer .wrap { padding-block: 24px 36px; display: grid; gap: 6px; }
   footer a { color: var(--band-ink); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .credit { margin: 0; }
+
+  /* Embed mode (?embed=1, see the script above): the map fills the frame; search floats over its top-left corner;
+     the legend and the credit link share a thin bar under it. */
+  .embed, .embed body { height: 100%; }
+  .embed body { display: flex; flex-direction: column; overflow: hidden; font-size: 14px; }
+  .embed .topbar, .embed .hero, .embed .evidence, .embed .info, .embed footer, .embed .sub, .embed #q-hint { display: none; }
+  .embed main { flex: 1; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0; display: flex; }
+  .embed .layout { display: block; position: relative; flex: 1; }
+  .embed .map-sec { position: absolute; inset: 0; display: grid; grid-template: "map map" minmax(0, 1fr) "legend credit" auto / minmax(0, 1fr) auto; background: var(--surface); }
+  .embed #map { grid-area: map; height: auto; border: 0; border-radius: 0; }
+  .embed .legend { grid-area: legend; margin: 0; padding: 5px 10px; gap: 2px 12px; font-size: 11.5px; border-top: 1px solid var(--line); }
+  .embed .legend .dot { width: 10px; height: 10px; margin-top: 0; }
+  .embed .credit { grid-area: credit; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; border-top: 1px solid var(--line); align-self: stretch; }
+  .embed .search-card { position: absolute; z-index: 2; top: 8px; left: 8px; width: min(310px, calc(100% - 60px)); max-height: calc(100% - 64px); overflow: auto; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); }
+  .embed #search-h, .embed label.field { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .embed .seg { margin-bottom: 8px; }
+  .embed .seg button { font-size: 12px; padding: 5px 4px; }
+  .embed .row { margin-bottom: 4px; gap: 6px; }
+  .embed .row > div.narrow { flex-basis: 96px; }
+  .embed input[type="text"], .embed select { font-size: 14px; padding: 6px 8px; }
+  .embed .filters { margin-top: 6px; font-size: 13px; }
+  .embed .filters summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+  .embed .filters fieldset { margin-top: 4px; }
+  .embed .filters legend { display: none; }
+  .embed .checks { font-size: 12.5px; }
+  .embed .summary { margin: 8px 0 6px; font-size: 13px; }
+  .embed .results { max-height: 160px; }
+  .embed .results button { padding: 7px 2px; }
+  @media (max-width: 480px) { .embed .legend { font-size: 11px; gap: 2px 8px; } .embed .credit { font-size: 11.5px; } }
 </style>
 </head>
 <body>
@@ -184,7 +245,7 @@
 
   <main class="wrap">
     <div class="layout">
-      <section class="card" aria-labelledby="search-h">
+      <section class="card search-card" aria-labelledby="search-h">
         <h2 id="search-h">Search near a place</h2>
         <p class="sub">Searches run in your browser; nothing you enter is sent anywhere.</p>
         <div class="seg" role="group" aria-label="Search by">
@@ -229,7 +290,7 @@
         <ul class="results" id="results"></ul>
       </section>
 
-      <section aria-label="Map">
+      <section class="map-sec" aria-label="Map">
         <div id="map" role="region" aria-label="Map of data centers"></div>
         <div class="legend" id="legend" aria-hidden="true">
           <span><i class="dot planned"></i> Planned</span>
@@ -239,6 +300,7 @@
           <span><i class="dia in-review"></i> County filing in review</span>
           <span><i class="dia approved"></i> County filing decided</span>
         </div>
+        <p class="credit" id="credit" hidden><a href="./" target="_blank" rel="noopener" title="Opens the full map in a new tab">Data Centers Near You ↗</a></p>
       </section>
     </div>
 

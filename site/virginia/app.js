@@ -13,6 +13,8 @@ const el = (tag, attrs = {}, text) => {
   if (text != null) e.textContent = text;
   return e;
 };
+// Embed mode (?embed=1): set up by the inline script in index.html's <head>, which documents the URL parameters.
+const EMBED = document.documentElement.classList.contains("embed");
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const STAGE_LABEL = { planned: "Planned", construction: "Under construction", operating: "Operating", shutdown: "Temporarily shut down", other: "Other" };
 const STAGE_ORDER = { planned: 0, construction: 1, operating: 2, shutdown: 3, other: 4 };
@@ -62,7 +64,7 @@ const visibleFilings = () => (state.filings ? filings : []);
 // theme.js (loaded in <head>) says whether the page is light or dark: Auto follows the device, or the viewer's pick.
 const isDark = () => (window.siteTheme ? window.siteTheme.effective() : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
 const styleUrl = () => `https://tiles.openfreemap.org/styles/${isDark() ? "dark" : "positron"}`;
-const map = new MLMap({ container: "map", style: styleUrl(), center: [-78.6, 37.9], zoom: 5.9, attributionControl: { compact: true }, cooperativeGestures: false });
+const map = new MLMap({ container: "map", style: styleUrl(), center: [-78.6, 37.9], zoom: 5.9, attributionControl: { compact: true }, cooperativeGestures: EMBED });
 map.addControl(new NavigationControl({ showCompass: false }), "top-right");
 map.fitBounds([[-83.7, 36.5], [-75.2, 39.5]], { padding: 20, animate: false });
 
@@ -176,6 +178,15 @@ function openFilingPopup(f, fly) {
   src.append(document.createTextNode("Source: "), el("a", { href: f.source, target: "_blank", rel: "noopener" }, `${f.county} record ${f.id}`));
   box.append(src);
   showPopup(f, box, fly);
+}
+
+// ---- embed --------------------------------------------------------------------------------------------------------
+// The credit link opens the full map (same search, if any) in a new tab; the filters fold away under the search box.
+function setCredit() { if (EMBED) $("#credit a").href = new URL("./" + location.hash, location.href).href; }
+if (EMBED) {
+  $("#credit").hidden = false; setCredit();
+  const details = el("details", { class: "filters" }); details.append(el("summary", {}, "Filters"));
+  const fs = document.querySelector(".search-card fieldset"); fs.replaceWith(details); details.append(fs);
 }
 
 // ---- search -------------------------------------------------------------------------------------------------------
