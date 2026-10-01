@@ -1,0 +1,125 @@
+{
+ "window_days_back": 21,
+ "counties": {
+  "Fairfax County": {
+   "checked": "2026-09-30",
+   "feed": "https://video.fairfaxcounty.gov/ViewPublisherRSS.php?view_id=7&mode=agendas",
+   "meetings": [
+    {
+     "id": "clip-4241",
+     "date": "2026-09-15",
+     "name": "Board of Supervisors Meeting",
+     "agenda_url": "https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&clip_id=4241",
+     "searched": false,
+     "items": [],
+     "note": "Fairfax posts its Board agendas as a PDF board package, which this site doesn't search yet. Open the agenda to check it."
+    },
+    {
+     "id": "clip-4260",
+     "date": "2026-09-29",
+     "name": "Board of Supervisors Meeting",
+     "agenda_url": "https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&clip_id=4260",
+     "searched": false,
+     "items": [],
+     "note": "Fairfax posts its Board agendas as a PDF board package, which this site doesn't search yet. Open the agenda to check it."
+    }
+   ]
+  },
+  "Loudoun County": {
+   "checked": "2026-09-30",
+   "feed": "https://loudoun.granicus.com/ViewPublisherRSS.php?view_id=89&mode=agendas",
+   "meetings": [
+    {
+     "id": "clip-8247",
+     "date": "2026-09-17",
+     "name": "Planning Commission Work Session",
+     "agenda_url": "https://loudoun.granicus.com/AgendaViewer.php?view_id=89&clip_id=8247",
+     "searched": true,
+     "items": [
+      {
+       "number": "3.",
+       "section": "Administrative Items",
+       "text": "Data Center Open Houses",
+       "why": "mentions a data center"
+      }
+     ],
+     "item_count": 15
+    },
+    {
+     "id": "clip-8252",
+     "date": "2026-09-22",
+     "name": "Planning Commission Public Hearing",
+     "agenda_url": "https://loudoun.granicus.com/AgendaViewer.php?view_id=89&clip_id=8252",
+     "searched": true,
+     "items": [],
+     "item_count": 14
+    }
+   ]
+  },
+  "Prince William County": {
+   "checked": "2026-09-30",
+   "feed": "https://pwcgov.granicus.com/ViewPublisherRSS.php?view_id=23&mode=agendas",
+   "meetings": [
+    {
+     "id": "clip-3903",
+     "date": "2026-09-09",
+     "name": "Joint Interjurisdictional Ad Hoc Committee",
+     "agenda_url": "https://pwcgov.granicus.com/AgendaViewer.php?view_id=23&clip_id=3903",
+     "searched": true,
+     "items": [],
+     "item_count": 9
+    },
+    {
+     "id": "clip-3906",
+     "date": "2026-09-15",
+     "name": "Board of County Supervisors Meeting - Work Session",
+     "agenda_url": "https://pwcgov.granicus.com/AgendaViewer.php?view_id=23&clip_id=3906",
+     "searched": true,
+     "items": [],
+     "item_count": 19
+    },
+    {
+     "id": "clip-3911",
+     "date": "2026-09-22",
+     "name": "Board of County Supervisors Meeting",
+     "agenda_url": "https://pwcgov.granicus.com/AgendaViewer.php?view_id=23&clip_id=3911",
+     "searched": true,
+     "items": [
+      {
+       "number": "7.D.",
+       "section": "Public Hearings",
+       "text": "ORD - DPA 2026-00006, Zoning Text Amendment to the Data Center Opportunity Zone Overlay District, County Code Section 32-509.01 Et Seq., and any Other Related Sections of the Zoning Ordinance, Including Corresponding Data Center Opportunity Zone Overlay District Map Amendments - Countywide",
+       "why": "mentions a data center"
+      }
+     ],
+     "item_count": 47
+    },
+    {
+     "id": "clip-3914",
+     "date": "2026-09-23",
+     "name": "Board of County Supervisors - Joint Meeting with the School Board",
+     "agenda_url": "https://pwcgov.granicus.com/AgendaViewer.php?view_id=23&clip_id=3914",
+     "searched": true,
+     "items": [],
+     "item_count": 9
+    },
+    {
+     "id": "event-3464",
+     "date": "2026-10-06",
+     "name": "Board of County Supervisors Meeting",
+     "agenda_url": "https://pwcgov.granicus.com/AgendaViewer.php?view_id=23&event_id=3464",
+     "searched": true,
+     "items": [
+      {
+       "number": "7.D.",
+       "section": "Consent Agenda",
+       "text": "RES - Authorize the Execution of an Agreement for Iron Mountain Data Centers Virginia 6, LLC, for the Maintenance of Sidewalks, Curb and Gutter, and Access Road in State-Maintained Right-of-Way - Brentsville Magisterial District",
+       "why": "mentions a data center"
+      }
+     ],
+     "item_count": 47
+    }
+   ]
+  }
+ }
+}

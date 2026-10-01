@@ -8,6 +8,7 @@ Writes:
   site/virginia/data/schools.json     Virginia public schools (landmark search)
   site/virginia/data/zips.json        Virginia ZIP code center points (ZIP search)
   site/virginia/data/meta.json        counts, build time, sources, DEQ's data disclaimer
+  site/virginia/data/meetings.json    county meetings with data center items (pipeline/civic.py; optional)
 
 Refuses to write anything if the data looks broken (see check()), so a source outage can't publish an empty map.
 """
@@ -24,6 +25,7 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "pipeline"))
 import changes  # noqa: E402
+import civic  # noqa: E402
 import geo  # noqa: E402
 import pages  # noqa: E402
 import sources  # noqa: E402
@@ -216,6 +218,7 @@ if __name__ == "__main__":
         json.dump(log, fh, ensure_ascii=False, indent=1)
         fh.write("\n")
     print(f"change log: {len(added)} new event(s) today; {len(log['events'])} since {log['since']}")
+    civic.refresh(os.path.join(OUT, "meetings.json"), CACHE, offline=args.offline)  # optional; never fails
     counts = pages.build_pages(SITE, STATE, fac, sch, zp, meta, log, CONFIG)
     print(f"pages: {counts['localities']} counties/cities, {counts['zips']} ZIP codes, {counts['schools']} schools, "
           f"{counts['facilities']} data centers ({counts['total']} total) + sitemap, RSS")

@@ -1,0 +1,61 @@
+{
+ "_about": "How to take part, per county: hand-checked on each county's official pages. Every fact carries its source page and the date it was checked. Only what the page says; no staff names or personal emails. Re-check before relying on a fact older than a few months: procedures change.",
+ "Fairfax County": {
+  "body": "Board of Supervisors",
+  "facts": [
+   {"text": "To speak at a Board of Supervisors public hearing, get on the Speakers List with the county's online speakers sign-up form, or by calling the Department of Clerk Services at 703-324-3151 (TTY 711).",
+    "source": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony", "checked": "2026-09-30"},
+   {"text": "In person or by phone: sign up by 12 p.m. on the day of the hearing.",
+    "source": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony", "checked": "2026-09-30"},
+   {"text": "By video: sign up and submit the video by 9 a.m. the day before the hearing.",
+    "source": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony", "checked": "2026-09-30"},
+   {"text": "In writing: by email or mail to the Clerk (addresses on the county's page), accepted until the public hearing is closed.",
+    "source": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony", "checked": "2026-09-30"},
+   {"text": "Public hearing speakers have 3 minutes as individuals and 5 minutes when speaking for an organization.",
+    "source": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony", "checked": "2026-09-30"}
+  ],
+  "links": [
+   {"label": "Speakers sign-up form", "url": "https://www.fairfaxcounty.gov/bosclerk/speakers-form"},
+   {"label": "Ways to provide public hearing testimony", "url": "https://www.fairfaxcounty.gov/clerkservices/ways-provide-public-hearing-testimony"}
+  ]
+ },
+ "Loudoun County": {
+  "body": "Board of Supervisors and Planning Commission",
+  "facts": [
+   {"text": "Board of Supervisors business meetings and public hearings: sign up in advance by noon on the day of the meeting by calling 703-777-0200. When signing up in advance, speakers can choose to speak in person or remotely by phone.",
+    "source": "https://www.loudoun.gov/4853/About-Board-of-Supervisors-Meetings", "checked": "2026-09-30"},
+   {"text": "You can also sign up in person, first come, first served, beginning 30 minutes before the meeting, with the clerk in the board room at the Government Center in Leesburg. During a public hearing, you can call 703-880-8534 to sign up to speak by phone.",
+    "source": "https://www.loudoun.gov/4853/About-Board-of-Supervisors-Meetings", "checked": "2026-09-30"},
+   {"text": "Comments during Board public hearings are limited to items on the public hearing agenda. Speakers are typically given at least two minutes.",
+    "source": "https://www.loudoun.gov/4853/About-Board-of-Supervisors-Meetings", "checked": "2026-09-30"},
+   {"text": "In writing: email all nine Board members, or leave a message on the Board's comment line, 703-777-0115.",
+    "source": "https://www.loudoun.gov/4853/About-Board-of-Supervisors-Meetings", "checked": "2026-09-30"},
+   {"text": "Planning Commission public hearings: ask to speak by noon on the day of the hearing, with the county's online sign-up form or by calling the Department of Planning and Zoning at 703-777-0246 (menu option 5). Written comments are welcome at any time by email or mail.",
+    "source": "https://www.loudoun.gov/1890/Speaking-at-Planning-Commission-Public-H", "checked": "2026-09-30"}
+  ],
+  "links": [
+   {"label": "About Board of Supervisors meetings", "url": "https://www.loudoun.gov/4853/About-Board-of-Supervisors-Meetings"},
+   {"label": "Speaking at Planning Commission public hearings", "url": "https://www.loudoun.gov/1890/Speaking-at-Planning-Commission-Public-H"}
+  ]
+ },
+ "Prince William County": {
+  "body": "Board of County Supervisors",
+  "facts": [
+   {"text": "Members of the public may attend Board meetings in person or take part remotely. To speak remotely, register by 5 p.m. the day before the meeting on the county's online sign-up site (pwcgov.granicusideas.com).",
+    "source": "https://www.pwcva.gov/department/board-county-supervisors", "checked": "2026-09-30"},
+   {"text": "In person: sign-up sheets at the back of Board Chambers or in the McCoart atrium open 30 minutes before the meeting. For a public hearing, sign-ups continue until the Chair closes the hearing; for Public Comment Time, they close 15 minutes after it begins.",
+    "source": "https://www.pwcva.gov/assets/2025-07/Public%20Comment%20Time%20and%20Public%20Hearing%20FAQs.pdf", "checked": "2026-09-30"},
+   {"text": "Each speaker has 3 minutes. At public hearings, one representative of a civic association, HOA or formally recognized organization may request 5 minutes.",
+    "source": "https://www.pwcva.gov/assets/2025-07/Public%20Comment%20Time%20and%20Public%20Hearing%20FAQs.pdf", "checked": "2026-09-30"},
+   {"text": "Public Comment Time is for general topics not on a scheduled public hearing.",
+    "source": "https://www.pwcva.gov/assets/2025-07/Public%20Comment%20Time%20and%20Public%20Hearing%20FAQs.pdf", "checked": "2026-09-30"},
+   {"text": "In writing: the Board's contact page lists how to email each supervisor.",
+    "source": "https://www.pwcva.gov/department/board-county-supervisors/contact-us", "checked": "2026-09-30"}
+  ],
+  "links": [
+   {"label": "Board of County Supervisors", "url": "https://www.pwcva.gov/department/board-county-supervisors"},
+   {"label": "Public Comment Time and Public Hearing FAQs (PDF)", "url": "https://www.pwcva.gov/assets/2025-07/Public%20Comment%20Time%20and%20Public%20Hearing%20FAQs.pdf"},
+   {"label": "Remote speaker sign-up", "url": "https://pwcgov.granicusideas.com/"}
+  ]
+ }
+}

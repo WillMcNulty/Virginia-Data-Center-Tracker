@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 
+import civic
 import geo
 
 STAGE_LABEL = {"planned": "Planned", "construction": "Under construction", "operating": "Operating",
@@ -32,7 +33,7 @@ SCHOOL_RADIUS, ZIP_RADIUS, NEIGHBOR_RADIUS = 2, 5, 1
 STATE_NAME = {"virginia": "Virginia"}
 ROOT_GENERATED = ["index.html", "about", "privacy", "sitemap.xml", "robots.txt",
                   "places", "zip", "schools", "browse"]  # the last four are the forwarding pages
-STATE_GENERATED = ["places", "zip", "schools", "data-centers", "new", "browse"]
+STATE_GENERATED = ["places", "zip", "schools", "data-centers", "new", "browse", "meetings"]
 DEQ_RECORD = "https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294/query?where=PLA_REG_NUM%3D{}&amp;outFields=*&amp;f=html"
 e = html.escape
 
@@ -170,7 +171,8 @@ def locality_pages(ctx):
     <p><a class="btn" href="{up}{s}/">Open the map</a></p>
 {facility_list(items, up, s, with_distance=False)}
     <p class="note">Stages are DEQ's own. Only sites that have applied for a DEQ air permit for backup generators
-      appear; earlier-stage proposals filed with the county are not included yet.</p>"""
+      appear; earlier-stage proposals filed with the county are not included yet.</p>
+{civic_section(ctx, loc, up)}"""
         write(ctx, path, shell(path, title, desc, body, cfg))
         index.append((loc, path, len(items), n_future))
     return index
@@ -345,6 +347,7 @@ def browse_page(ctx, loc_idx, zip_idx, school_idx):
     body = f"""    <h1>Browse {STATE_NAME[s]} data centers by place</h1>
     <p class="lede">Every county, ZIP code and public school in {STATE_NAME[s]} with a data center nearby on DEQ's
       records. {meta['facilities']} data centers statewide as of the last refresh.</p>
+    <p><a href="{up}{s}/meetings/">Upcoming county meetings with data center items</a>, and how to take part.</p>
     <h2>Counties and cities</h2>
     {ul(loc_idx, lambda r: f'<li><a href="{up}{r[1]}">{e(r[0])}</a> <span>{plural(r[2], "data center")}' + (f', {r[3]} not yet operating' if r[3] else '') + '</span></li>')}
     <h2>Schools with a data center within {SCHOOL_RADIUS} miles</h2>
@@ -353,6 +356,140 @@ def browse_page(ctx, loc_idx, zip_idx, school_idx):
     {ul(zip_idx, lambda r: f'<li><a href="{up}{r[1]}">{r[0]}</a> <span>{r[2]} within {ZIP_RADIUS} mi</span></li>')}"""
     write(ctx, path, shell(path, f"Browse {STATE_NAME[s]} data centers by county, ZIP code or school",
                            f"Every {STATE_NAME[s]} county, ZIP code and public school with a data center nearby, from state records.", body, cfg))
+
+
+# ---- civic: meetings with data center items, and how to take part (data from pipeline/civic.py) -------------------
+
+STALE_DAYS = 7  # say so when the agendas were last read longer ago than this
+
+
+def _today(ctx):
+    return ctx.get("today") or dt.date.today()
+
+
+def _split_meetings(block, today):
+    """(upcoming, recent) meetings in date order; recent = the last WINDOW_DAYS_BACK days."""
+    start = (today - dt.timedelta(days=civic.WINDOW_DAYS_BACK)).isoformat()
+    ms = sorted(block.get("meetings", []), key=lambda m: (m["date"], m["name"]))
+    return ([m for m in ms if m["date"] >= today.isoformat()],
+            [m for m in ms if start <= m["date"] < today.isoformat()])
+
+
+def _item_rows(meetings):
+    rows = []
+    for m in meetings:
+        for it in m["items"]:
+            where = f"{e(it['section'])} › " if it.get("section") else ""
+            rows.append(f"""      <li class="fac">
+        <div class="fac-head"><span><b>{fmt_date(m['date'])}</b> · {e(m['name'])}</span></div>
+        <div class="meta">{where}{e(it['number'])} {e(it['text'])}</div>
+        <div class="meta"><a href="{e(m['agenda_url'])}">Official agenda</a> · confirm there: agendas can change before and during a meeting</div>
+      </li>""")
+    return "    <ul class=\"facs\">\n" + "\n".join(rows) + "\n    </ul>" if rows else ""
+
+
+def _checked_line(block, today):
+    checked = block["checked"]
+    age = (today - dt.date.fromisoformat(checked)).days
+    stale = (f" That was {age} days ago, so newer agendas may be posted: check the county's agenda page."
+             if age > STALE_DAYS else "")
+    return (f'    <p class="when">Agendas last checked {fmt_date(checked)} from the county\'s '
+            f'<a href="{e(block["feed"])}">official agenda feed</a>.{stale}</p>')
+
+
+def _take_part(loc, part, level="h3"):
+    if not part:
+        return ""
+    facts = "".join(f'<li>{e(f["text"])} <span class="when">(<a href="{e(f["source"])}">source</a>, '
+                    f'checked {fmt_date(f["checked"])})</span></li>' for f in part["facts"])
+    links = " · ".join(f'<a href="{e(x["url"])}">{e(x["label"])}</a>' for x in part.get("links", []))
+    return f"""    <{level}>How to take part in {e(loc)}</{level}>
+    <p>Procedures of the {e(part['body'])}, from the county's own pages. Confirm on the county's page before a
+      meeting; procedures and deadlines can change.</p>
+    <ul class="plain">{facts}</ul>
+    <p>{links}</p>"""
+
+
+def _county_block(ctx, loc, up):
+    """The meetings page's section for one county."""
+    civ = ctx["civic"]
+    block = civ["meetings"].get("counties", {}).get(loc)
+    part = civ["participation"].get(loc)
+    head = f'    <h2 id="{slug(loc)}">{e(loc)}</h2>'
+    if not block:
+        return "\n".join([head, "    <p>This county's agendas haven't been checked yet.</p>", _take_part(loc, part)])
+    today = _today(ctx)
+    upcoming, recent = _split_meetings(block, today)
+    parts = [head, _checked_line(block, today)]
+    weeks = f"Past {civic.WINDOW_DAYS_BACK // 7} weeks"
+    for label, ms, empty in [("Upcoming", upcoming, "No upcoming agendas were posted when last checked."),
+                             (weeks, recent, f"No meetings in the {weeks.lower()} on the county's agenda feed.")]:
+        none = (empty if not ms else "No item that mentions a data center on the agendas checked."
+                if any(m["searched"] for m in ms) else "These agendas couldn't be searched (see below).")
+        parts.append(f"    <h3>{label}</h3>")
+        parts.append(_item_rows(ms) or f"    <p>{none}</p>")
+    checked = [m for m in upcoming + recent if m["searched"] and not m["items"]]
+    unsearched = [m for m in upcoming + recent if not m["searched"]]
+    if checked:
+        parts.append("    <p>Also checked, with no item that mentions a data center: " + "; ".join(
+            f'<a href="{e(m["agenda_url"])}">{fmt_date(m["date"])}, {e(m["name"])}</a>' for m in checked) + ".</p>")
+    if unsearched:
+        notes = sorted({m.get("note") or "" for m in unsearched})
+        parts.append("    <p>Not searched: " + "; ".join(
+            f'<a href="{e(m["agenda_url"])}">{fmt_date(m["date"])}, {e(m["name"])}</a>' for m in unsearched)
+            + ". " + " ".join(e(n) for n in notes if n) + "</p>")
+    parts.append(_take_part(loc, part))
+    return "\n".join(p for p in parts if p)
+
+
+def meetings_page(ctx):
+    s, cfg = ctx["state"], ctx["cfg"]
+    path = f"{s}/meetings/"
+    up = "../" * path.count("/")
+    counties = [c["locality"] for c in civic.COUNTIES]
+    today = _today(ctx)
+    n = 0
+    for loc in counties:
+        block = ctx["civic"]["meetings"].get("counties", {}).get(loc)
+        if block:
+            n += sum(len(m["items"]) for m in _split_meetings(block, today)[0])
+    jump = " · ".join(f'<a href="#{slug(c)}">{e(c)}</a>' for c in counties)
+    body = f"""    <p class="crumbs"><a href="{up}{s}/browse/">Browse</a> › Meetings</p>
+    <h1>Upcoming meetings with data center items</h1>
+    <p class="lede">Agenda items that mention data centers at county board meetings in {e(', '.join(counties[:-1]))}
+      and {e(counties[-1])}, from each county's published agendas, with how to take part. <b>{plural(n, 'item')}</b>
+      on upcoming agendas as of the last check.</p>
+    <p>{jump}</p>
+    <p class="note">How items are found: an item is listed when its title on the agenda says "data center" (or names a
+      case number that is a data center filing on the county's records). Items about a data center that don't say so
+      in their title are not caught, and a listed item may only touch on a data center. Item text is shown as the
+      agenda shows it, without staff names. Always confirm on the official agenda.</p>
+{chr(10).join(_county_block(ctx, loc, up) for loc in counties)}"""
+    write(ctx, path, shell(path, "Upcoming county meetings with data center items: Fairfax, Loudoun, Prince William",
+                           "Agenda items that mention data centers at upcoming county board meetings in Fairfax, Loudoun "
+                           "and Prince William counties, with how to sign up to speak or send written comments.",
+                           body, cfg))
+
+
+def civic_section(ctx, loc, up):
+    """A short "Public meetings" section for a county page (empty for places the civic layer doesn't cover)."""
+    civ = ctx.get("civic")
+    if not civ or loc not in civic.BY_LOCALITY:
+        return ""
+    s = ctx["state"]
+    block = civ["meetings"].get("counties", {}).get(loc)
+    more = f'<a href="{up}{s}/meetings/#{slug(loc)}">All agendas checked, and how to take part</a>'
+    if not block:
+        return f"    <h2>Public meetings</h2>\n    <p>{more}.</p>"
+    today = _today(ctx)
+    upcoming, recent = _split_meetings(block, today)
+    n_up, n_recent = (sum(len(m["items"]) for m in ms) for ms in (upcoming, recent))
+    summary = (f"Agenda items that mention data centers: <b>{n_up}</b> on upcoming agendas, {n_recent} in the past "
+               f"{civic.WINDOW_DAYS_BACK // 7} weeks.")
+    return f"""    <h2>Public meetings</h2>
+    <p>{summary} {more}.</p>
+{_item_rows(upcoming + recent)}
+{_checked_line(block, today)}"""
 
 
 # ---- site-wide pages ------------------------------------------------------------------------------------------------
@@ -411,7 +548,9 @@ def about_page(ctx):
     <h2>What's not here yet</h2>
     <p>Earlier-stage proposals (rezonings and special exceptions filed with a county before any air permit), cost
       and size from county building permits, and, by ZIP code, the upcoming hearings, comment periods and elections
-      where residents can weigh in. Those are being added next, then more states.</p>
+      where residents can weigh in. Those are being added next, then more states. A first piece is up:
+      <a href="../virginia/meetings/">upcoming county meetings with data center items</a> in Fairfax, Loudoun and
+      Prince William, from the counties' published agendas, with how to sign up to speak or send comments.</p>
     <h2>Who made it</h2>
     <p>William McNulty, a Computer Science and Economics student at the University of Virginia. An independent project,
       not affiliated with Virginia DEQ, any locality or any company shown. <a href="{e(cfg['contact_url'])}">Contact</a> ·
@@ -485,12 +624,14 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg):
             shutil.rmtree(p)
     ctx = {"out": site_dir, "state": state, "facilities": facilities, "schools": schools, "zips": zips,
            "meta": meta, "log": log, "cfg": cfg, "urls": []}
+    ctx["civic"] = civic.for_pages(os.path.join(site_dir, state, "data"))  # meetings + how to take part
     loc_idx = locality_pages(ctx)
     zip_idx = zip_pages(ctx)
     ctx["zip_has_page"] = {r[0]: True for r in zip_idx}
     school_idx = school_pages(ctx)
     facility_pages(ctx)
     new_page(ctx)
+    meetings_page(ctx)
     browse_page(ctx, loc_idx, zip_idx, school_idx)
     front_door(ctx)
     about_page(ctx)

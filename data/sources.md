@@ -50,6 +50,36 @@ Checked 2026-09-27 and 2026-09-28.
 - **Limit:** a ZIP code's center can be a few miles from any given home in it; the page says distances are measured
   from the center, and a school or a pin gives a precise point.
 
+## County meeting agendas (civic layer, `pipeline/civic.py`)
+
+- Granicus agenda RSS, `ViewPublisherRSS.php?view_id=N&mode=agendas`: Fairfax (`video.fairfaxcounty.gov`, view 7,
+  Board of Supervisors), Loudoun (`loudoun.granicus.com`, view 89, Board of Supervisors, Planning Commission and
+  committees; the feed is titled "2024 Archive" but carries 2026 meetings), Prince William (`pwcgov.granicus.com`,
+  view 23, Board of County Supervisors and joint meetings). Meeting dates come from the item title ("... - Sep 22,
+  2026"); Fairfax posts every meeting twice (the second copy has Spanish captions), kept once.
+- Agendas: Loudoun's link opens an HTML agenda (`GeneratedAgendaViewer.php`); Prince William's opens an HTML
+  agenda stored on Granicus's S3 bucket. Items are the numbered lines ("7.D.", "VI." then "3."). Fairfax's link
+  forwards to the meeting page on fairfaxcounty.gov, whose agenda is a PDF board package (13 MB for Sept. 15,
+  2026): not searched; the meetings are listed with a link.
+- **robots.txt (checked 2026-09-30):** all three Granicus hosts answer `User-agent: *` / `Disallow: /` (only named
+  search engines are allowed). Following the project rule, the build doesn't fetch them (`RESPECT_ROBOTS_TXT`), so
+  `site/virginia/data/meetings.json` is refreshed by hand from pages saved in a browser
+  (`python pipeline/civic.py --saved DIR`), like DEQ's permit list, until the owner decides otherwise (for example
+  after asking the counties' clerks). The 2026-09-30 file was made that way from 1 feed per county and 7 agendas.
+- Item text is shown as the agenda has it, minus presenter/staff names (Prince William's "- Name, Department" and
+  Loudoun's "Project Manager: Name"); `check()` refuses output with an email address or a staff label.
+- **Limit:** an item is found only if its title says "data center" (or, once county filings are wired in, names a
+  data center case number); items about a data center project that don't say so are missed.
+- No Legistar API for these counties: the Legistar client `pwcgov` is not Prince William County, and
+  `fairfaxcounty`/`loudoun` don't exist.
+
+## How to take part (`data/participation.json`)
+
+- Hand-checked on 2026-09-30 from the counties' own pages: Fairfax Clerk Services' "Ways to Provide Public Hearing
+  Testimony"; Loudoun's "About Board of Supervisors Meetings" and "Speaking at Planning Commission Public
+  Hearings"; Prince William's Board of County Supervisors page and its Public Comment Time and Public Hearing FAQs
+  (PDF). Each fact carries its source and checked date. Office phone lines only; no staff names or emails.
+
 ## Map
 
 - MapLibre GL JS 6.11.2, served from `site/vendor/` (BSD-3-Clause; `site/vendor/LICENSE`).
