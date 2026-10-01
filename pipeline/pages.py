@@ -4,6 +4,7 @@ itself is a JavaScript app, which crawlers mostly can't read).
 Layout (the domain is state-neutral, so each state gets its own folder):
   /                                   front door: search near you, coverage
   /about/  /privacy/                  site-wide pages
+  /data/  /methodology/               CSV downloads (pipeline/downloads.py) + embed code; sources and known issues
   /virginia/                          the Virginia map (hand-written, site/virginia/index.html)
   /virginia/places/<locality>/        one page per county or city with any data center on DEQ's records
   /virginia/zip/<zip>/                one per ZIP code with a data center within 5 miles of its center
@@ -25,6 +26,7 @@ import shutil
 
 import cards
 import civic
+import downloads
 import geo
 
 STAGE_LABEL = {"planned": "Planned", "construction": "Under construction", "operating": "Operating",
@@ -33,7 +35,7 @@ STAGE_ORDER = ["planned", "construction", "operating", "shutdown", "other"]
 SCHOOL_RADIUS, ZIP_RADIUS, NEIGHBOR_RADIUS = 2, 5, 1
 FILING_RADIUS = 2  # county filings are listed within 2 miles of a school, ZIP center or data center
 STATE_NAME = {"virginia": "Virginia"}
-ROOT_GENERATED = ["index.html", "about", "privacy", "sitemap.xml", "robots.txt",
+ROOT_GENERATED = ["index.html", "about", "privacy", "data", "methodology", "sitemap.xml", "robots.txt",
                   "places", "zip", "schools", "browse"]  # the last four are the forwarding pages
 STATE_GENERATED = ["places", "zip", "schools", "data-centers", "new", "browse", "meetings"]
 DEQ_RECORD = "https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294/query?where=PLA_REG_NUM%3D{}&amp;outFields=*&amp;f=html"
@@ -125,7 +127,7 @@ def shell(path, title, description, body, cfg, state="virginia", card=None):
   <footer class="band">
     <div class="wrap">
       <div>An independent project; not affiliated with Virginia DEQ, any locality, or any company shown.
-        Data from public state records. <a href="{up}privacy/">Privacy</a> · <a href="{up}about/">About</a> ·
+        Data from public state records. <a href="{up}privacy/">Privacy</a> · <a href="{up}about/">About</a> · <a href="{up}data/">Data</a> · <a href="{up}methodology/">Methodology</a> ·
         <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a></div>
     </div>
   </footer>
@@ -665,7 +667,10 @@ def about_page(ctx):
       a project appears once it applies for one; the stage shown is DEQ's own. Permit dates come from DEQ's list of
       issued data center air permits. Schools are from the National Center for Education Statistics and ZIP codes
       from the U.S. Census Bureau. The data refreshes every morning, changes are logged on "New this week", and the
-      build refuses to publish if a source looks broken. Every site links to its DEQ record.</p>
+      build refuses to publish if a source looks broken. Every site links to its DEQ record. The
+      <a href="../methodology/">methodology</a> explains each source and its known issues, and the
+      <a href="../data/">data downloads</a> page has the data as spreadsheets (free to reuse with attribution) and
+      an embed code for the map.</p>
     <p>Earlier-stage proposals come from county records: land-use applications (rezonings, special exceptions) and
       site plans that mention a data center, from {e(filing_counties(ctx))}'s public land application records so far.
       They're shown as diamonds on the map and listed on school, ZIP code, county and data center pages, each linked
@@ -715,6 +720,257 @@ def privacy_page(ctx):
     <p><a href="{e(cfg['contact_url'])}">Contact the author</a>.</p>"""
     write(ctx, "privacy/", shell("privacy/", "Privacy policy · Data Centers Near You",
                                  "How Data Centers Near You uses cookieless analytics and what your browser stores.", body, cfg))
+
+
+# ---- data downloads, methodology, embed snippet ---------------------------------------------------------------------
+
+CODE = "https://github.com/WillMcNulty/Virginia-Data-Center-Tracker"
+RADII = [1, 3, 5, 10, 30]  # the map's radius choices (site/geo.js parseHash)
+EMBED_JS = """
+(() => {
+  const form = document.getElementById("embedform"), out = document.getElementById("snippet");
+  const base = form.dataset.base, schools = new Map();
+  const $ = (id) => document.getElementById(id);
+  function build() {
+    const q = new URLSearchParams({ embed: "1" });
+    if ($("e-theme").value) q.set("theme", $("e-theme").value);
+    let hash = "", msg = "";
+    const start = form.querySelector("input[name=start]:checked").value, r = $("e-r").value;
+    if (start === "zip") {
+      const z = $("e-zip").value.trim();
+      if (/^\\d{5}$/.test(z)) hash = "#zip=" + z + "&r=" + r; else msg = "Enter a 5-digit ZIP code.";
+    } else if (start === "school") {
+      const id = schools.get($("e-school").value.trim());
+      if (id) hash = "#school=" + encodeURIComponent(id) + "&r=" + r; else msg = "Pick a school from the list.";
+    }
+    const w = $("e-w").value.trim() || "100%", h = Math.max(300, Number($("e-h").value) || 600);
+    const width = /^\\d+$/.test(w) ? w : (/^\\d{1,3}%$/.test(w) ? w : "100%");
+    const src = base + "?" + q.toString() + hash;
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    out.value = '<iframe src="' + esc(src) + '" width="' + width + '" height="' + h + '" style="border:0" ' +
+      'title="Data Centers Near You: map of Virginia data centers" loading="lazy"></iframe>';
+    $("e-msg").textContent = msg; $("e-msg").hidden = !msg;
+    $("e-preview").href = src;
+  }
+  form.addEventListener("input", build); form.addEventListener("change", build);
+  $("e-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(out.value); } catch { out.select(); document.execCommand("copy"); }
+    $("e-copied").hidden = false; setTimeout(() => { $("e-copied").hidden = true; }, 2000);
+  });
+  fetch(form.dataset.schools).then((r) => r.json()).then((list) => {
+    const dl = $("e-schools");
+    for (const s of list) {
+      const label = (s.aka && s.aka[0] ? s.aka[0] : s.name) + " (" + s.city + ")";
+      if (schools.has(label)) continue;
+      schools.set(label, s.id); const o = document.createElement("option"); o.value = label; dl.append(o);
+    }
+  }).catch(() => {});
+  build();
+})();
+"""
+
+
+def columns_table(key):
+    rows = "".join(f"<tr><td><code>{e(c)}</code></td><td>{e(d)}</td></tr>" for c, d in downloads.COLUMNS[key])
+    return f'    <table class="cols"><thead><tr><th>Column</th><th>What it holds</th></tr></thead><tbody>{rows}</tbody></table>'
+
+
+def data_page(ctx):
+    """/data/: the CSV downloads (written here, after build_pages cleared the folder), their columns, the reuse
+    note and the embed snippet generator."""
+    s, cfg, meta = ctx["state"], ctx["cfg"], ctx["meta"]
+    path, up = "data/", "../"
+    files = downloads.write(os.path.join(ctx["out"], "data"), s, ctx["facilities"], ctx["log"], ctx["filings"])
+    built = fmt_date(meta["built_at"][:10]) if meta.get("built_at") else fmt_date(dt.date.today().isoformat())
+    base = cfg["site_url"].rstrip("/")
+
+    def dl(key, what):
+        name, n = files[key]
+        size = os.path.getsize(os.path.join(ctx["out"], "data", name))
+        return f'<li><a href="{e(name)}" download>{e(name)}</a> <span class="when">{plural(n, "row")}, {max(1, round(size / 1024))} KB</span>: {what}</li>'
+    radius = "".join(f'<option value="{r}"{" selected" if r == 3 else ""}>{plural(r, "mile")}</option>' for r in RADII)
+    body = f"""    <h1>Data downloads</h1>
+    <p class="lede">The data behind the map, as spreadsheets (CSV, UTF-8). Built {built} from the official records
+      described in the <a href="{up}methodology/">methodology</a>; the files are rebuilt every morning with the map.</p>
+    <ul class="plain">
+      {dl("data-centers", f"every data center on Virginia DEQ's records ({meta['facilities']} today), with stage, address, locality and issued air permits (DEQ's permit list as of {fmt_date(meta.get('permit_snapshot'))}).")}
+      {dl("changes", f"every change logged on <a href=\"{up}{s}/new/\">New this week</a> since {fmt_date(ctx['log']['since'])}: new sites, stage changes, new air permits, new county filings and their status changes.")}
+      {dl("county-filings", f"county land-use applications and site plans that mention a data center ({e(filing_counties(ctx))} so far).")}
+    </ul>
+    <p class="note">Each row links to its official record. The same data is also published as JSON for the map,
+      in <a href="{up}{s}/data/facilities.json">facilities.json</a>, <a href="{up}{s}/data/changes.json">changes.json</a>
+      and <a href="{up}{s}/data/filings.json">filings.json</a>. No personal data is included: no visitor data, no
+      county staff names or emails, and no private landowner names.</p>
+    <h2>Reusing this data</h2>
+    <p>You may reuse, republish and adapt these files, including in news stories and research, with attribution:
+      credit “Data Centers Near You, from Virginia DEQ and county records” and link to
+      <a href="{e(base)}/">{e(base)}/</a>. The underlying public records belong to their publishers (Virginia DEQ,
+      the counties, NCES and the Census Bureau), and their own terms and notices still apply; DEQ's data notice is
+      on the map page. Stages and statuses are the agencies' own; anything this site calculates is marked as ours in
+      the column notes below. Please check important facts against the linked official record.</p>
+    <h2>Columns</h2>
+    <h3>{e(files["data-centers"][0])}</h3>
+{columns_table("data-centers")}
+    <h3>{e(files["changes"][0])}</h3>
+{columns_table("changes")}
+    <h3>{e(files["county-filings"][0])}</h3>
+{columns_table("county-filings")}
+    <p class="note">Columns stay the same from day to day; new ones are only ever added at the end.</p>
+    <h2 id="embed">Embed the map</h2>
+    <p>Newsrooms, schools and community groups can put the map on their own page. Choose a starting point and size,
+      then copy the code.</p>
+    <form id="embedform" class="embedform" data-base="{e(base)}/{s}/" data-schools="{up}{s}/data/schools.json" onsubmit="return false">
+      <fieldset><legend>Start the map at</legend>
+        <label><input type="radio" name="start" value="none" checked> All of Virginia</label>
+        <label><input type="radio" name="start" value="zip"> A ZIP code
+          <input id="e-zip" inputmode="numeric" maxlength="5" placeholder="e.g. 20171" aria-label="ZIP code"></label>
+        <label><input type="radio" name="start" value="school"> A school
+          <input id="e-school" list="e-schools" placeholder="Type a school name" aria-label="School"></label>
+        <datalist id="e-schools"></datalist>
+        <label>Within <select id="e-r">{radius}</select></label>
+      </fieldset>
+      <div class="row">
+        <label>Width <input id="e-w" value="100%" size="6" aria-describedby="e-w-hint"></label>
+        <label>Height (px) <input id="e-h" type="number" value="600" min="300" max="2000" step="10"></label>
+        <label>Colors <select id="e-theme"><option value="">Follow the reader's device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      </div>
+      <p class="note" id="e-w-hint">Width: pixels (e.g. 800) or a percentage (e.g. 100%).</p>
+      <p class="note" id="e-msg" hidden></p>
+      <label for="snippet">Embed code</label>
+      <textarea id="snippet" rows="4" readonly></textarea>
+      <p><button class="btn" type="button" id="e-copy">Copy code</button> <span id="e-copied" hidden>Copied.</span>
+        <a id="e-preview" href="{up}{s}/" target="_blank" rel="noopener">Preview in a new tab</a></p>
+    </form>
+    <p class="note">The embedded map shows a small “Data Centers Near You” credit link; please leave it in place.
+      Searches in the embedded map run in the reader's browser, like on this site.</p>
+    <script>{EMBED_JS}</script>"""
+    write(ctx, path, shell(path, "Data downloads · Data Centers Near You",
+                           "Download Virginia data center records, the change log and county filings as CSV, "
+                           "with column notes, reuse terms and an embed code for the map.", body, cfg))
+    return files
+
+
+def methodology_page(ctx):
+    s, cfg, meta = ctx["state"], ctx["cfg"], ctx["meta"]
+    path, up = "methodology/", "../"
+    src = meta.get("sources", {})
+    air = src.get("deq_air_sites", "https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294")
+    permit_page = src.get("deq_permit_page", "https://www.deq.virginia.gov/news-info/shortcuts/permits/air/issued-air-permits-for-data-centers")
+    counties = air.rsplit("/", 1)[0] + "/157"
+    lola = src.get("loudoun_lola", "https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0")
+    nces = src.get("nces_schools", "https://nces.ed.gov/opengis/rest/services/K12_School_Locations/EDGE_GEOCODE_PUBLICSCH_2425/MapServer/0")
+    zcta = src.get("census_zcta", "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2025_Gazetteer/2025_Gaz_zcta_national.zip")
+    feeds = " · ".join(f'<a href="{c["host"]}/ViewPublisherRSS.php?view_id={c["view"]}&amp;mode=agendas">{e(c["locality"])}</a>'
+                       for c in civic.COUNTIES)
+    robots = " · ".join(f'<a href="{c["host"]}/robots.txt">{e(c["locality"])}</a>' for c in civic.COUNTIES)
+    split = [f for f in ctx["facilities"] if f.get("listed_locality") and f["listed_locality"] != f["locality"]]
+    split_links = ", ".join(f'<a href="{downloads_record(f["id"])}">{f["id"]}</a>' for f in split)
+    no_addr = sum(1 for f in ctx["facilities"] if not f["address"])
+    no_zip = sum(1 for f in ctx["facilities"] if not f["zip"])
+    fil = ctx.get("filings") or []
+    old_review = [f for f in fil if f["status"] == "in-review" and f["date"] < "2021-01-01"]
+    old_links = ", ".join(f'<a href="{e(f["source"])}">{e(f["id"])}</a>' for f in old_review[:5])
+    stage_rows = "".join(f"<tr><td>{e(k)}</td><td>{e(STAGE_LABEL[v])}</td></tr>" for k, v in
+                         [("Planned", "planned"), ("Under Construction", "construction"), ("Operating", "operating"),
+                          ("Temporarily Shutdown", "shutdown")])
+    body = f"""    <h1>Methodology</h1>
+    <p class="lede">Where every piece of this site's data comes from, how it is put together, and what it can't tell
+      you. The data itself is on the <a href="{up}data/">downloads page</a>.</p>
+    <h2>Sources</h2>
+    <ul class="plain">
+      <li><b>Virginia DEQ, Air Sites (daily).</b> Every site DEQ flags as a data center on its
+        <a href="{e(air)}">Air Sites layer</a> ({meta['facilities']} on the last refresh), with its name, address,
+        location and operating status. Data centers need a DEQ air permit for their backup generators, so a project
+        appears here once it applies for one.</li>
+      <li><b>Virginia DEQ, issued air permits for data centers.</b> Permit numbers, dates and programs come from
+        <a href="{e(permit_page)}">DEQ's list of issued air permits for data centers</a>. That page blocks automated
+        requests, so it is saved by hand from a normal browser as a dated snapshot (currently as of
+        {fmt_date(meta.get('permit_snapshot'))}) and joined to the Air Sites records by registration number.</li>
+      <li><b>Virginia DEQ, county and city boundaries.</b> Which county or independent city a site is in comes from
+        DEQ's <a href="{e(counties)}">boundary layer</a>: a point-in-polygon calculation by this site.</li>
+      <li><b>Loudoun County land applications (LOLA).</b> Rezonings, special exceptions, other land-use applications
+        and site plans that mention a data center, from
+        <a href="{e(lola)}">Loudoun's public land application records</a>. Sub-applications are folded into their
+        umbrella application so each proposal appears once. The fields that name reviewing staff are never
+        downloaded, and names of people are removed from descriptions.</li>
+      <li><b>Public schools.</b> Names and locations from the National Center for Education Statistics'
+        <a href="{e(nces)}">school locations</a> (2024-25). Common names (such as “Rachel Carson Middle School” for
+        NCES's “Carson Middle”) are added by hand.</li>
+      <li><b>ZIP codes.</b> Center points of ZIP Code Tabulation Areas from the U.S. Census Bureau's
+        <a href="{e(zcta)}">2025 Gazetteer file</a>.</li>
+      <li><b>County meeting agendas.</b> The <a href="{up}{s}/meetings/">meetings page</a> lists agenda items that
+        mention a data center, from the agenda feeds that Fairfax, Loudoun and Prince William publish
+        ({feeds}). Those servers ask automated programs not to fetch them in their robots.txt files ({robots}), so
+        this site doesn't fetch them automatically: the agendas are saved by hand from a normal browser and
+        refreshed periodically. The page says when they were last checked.</li>
+    </ul>
+    <h2>Stages</h2>
+    <p>The stage shown for each data center is DEQ's own operating status on the
+      <a href="{e(air)}">Air Sites layer</a>, renamed only for readability. This site does not judge a site's stage
+      itself.</p>
+    <table class="cols"><thead><tr><th>DEQ status</th><th>Shown as</th></tr></thead><tbody>{stage_rows}</tbody></table>
+    <p>County filings show the county's own status (for example “In Review” or “Approved”), with a plain-language
+      label. Grouping filings into land-use applications (decided by the county board, usually after a public
+      hearing) and site plans (reviewed by county staff) is this site's own classification of the county's
+      application types.</p>
+    <h2>Distances</h2>
+    <p>Distances are straight-line (“as the crow flies”) between two points, using the haversine formula on a sphere
+      with the Earth's mean radius (3,958.8 miles), not driving distance. A ZIP code search measures from the ZIP
+      code's Census center point, which can be a few miles from a given home in it; a school or a dropped pin gives a
+      precise point. The calculation is the same in the build (<a href="{CODE}/blob/main/pipeline/geo.py">geo.py</a>)
+      and in your browser (<a href="{CODE}/blob/main/site/geo.js">geo.js</a>), and tests check the two agree.
+      A data center's point is DEQ's location for the site; a county filing's point is the center of its parcel
+      outline, calculated by this site.</p>
+    <h2>The change log</h2>
+    <p>Every morning the build compares the day's records with the previous day's and logs what changed: new sites,
+      stage changes, new air permits, renamed or removed sites, new county filings and filing status changes. The
+      log started on {fmt_date(ctx['log']['since'])}; it shows when this site noticed a change, which can be later
+      than the date the agency made it. It feeds <a href="{up}{s}/new/">New this week</a>, its RSS feed and the
+      <a href="{up}data/">changes download</a>. If a source looks broken (for example, far fewer data centers than the
+      day before), the build refuses to publish and the previous day's data stays up.</p>
+    <h2>Our own classifications and estimates</h2>
+    <ul class="plain">
+      <li>The locality of each data center (point-in-polygon on DEQ's boundaries, above).</li>
+      <li>Land-use application versus site plan for county filings, the plain-English application types and status
+        labels, and the filing's point (the parcel center).</li>
+      <li>Which schools and ZIP codes get a page: those with a data center within {SCHOOL_RADIUS} miles of the school
+        or {ZIP_RADIUS} miles of the ZIP code's center, or a county filing within {FILING_RADIUS} miles.</li>
+      <li>Common school names, added by hand to NCES's official short names.</li>
+      <li>Which agenda items are about data centers (the item's text says “data center” or names a tracked case
+        number).</li>
+    </ul>
+    <h2>Known issues</h2>
+    <ul class="plain">
+      <li><b>Manassas city line.</b> {plural(len(split), 'site')} near the Manassas airport ({split_links}) fall in
+        Prince William County on DEQ's <a href="{e(counties)}">boundary layer</a>, but
+        <a href="{e(permit_page)}">DEQ's permit list</a> says Manassas City. The two official sources disagree, so
+        the site shows both rather than pick one.</li>
+      <li><b>Missing addresses.</b> {plural(no_addr, 'DEQ record')} {'has' if no_addr == 1 else 'have'} no street
+        address and {plural(no_zip, 'record')} no ZIP code on the <a href="{e(air)}">Air Sites layer</a>; pages say
+        “not listed by DEQ”.</li>
+      <li><b>Permits not yet on the list.</b> {plural(meta.get('facilities_without_permit_row', 0), 'site')} on the
+        Air Sites layer {'has' if meta.get('facilities_without_permit_row', 0) == 1 else 'have'} no row on DEQ's issued-permit list yet,
+        probably because the permit is still in progress; and the list itself is a hand-saved snapshot, so the newest
+        permits can lag.</li>
+      <li><b>Old applications still “In Review”.</b> A few Loudoun applications filed years ago still show “In Review”
+        on the county's records ({old_links or 'none at the moment'}). The site shows the county's status as it is.</li>
+      <li><b>County filings are Loudoun only so far.</b> Fairfax and Prince William filings are not included yet,
+        so a project there appears only once it is on DEQ's records.</li>
+      <li><b>Agenda items can be missed.</b> An agenda item about a data center project that doesn't say “data
+        center” or name a tracked case number isn't found; Fairfax's agendas are PDF board packages and aren't
+        searched.</li>
+    </ul>
+    <p class="note">Spotted a mistake? Each item on the site links to its official record; if the site differs from
+      the record, the record is right. <a href="{e(cfg['contact_url'])}">Tell us</a> and it will be fixed. The full
+      source notes, including dates checked, are in the
+      <a href="{CODE}/blob/main/data/sources.md">project's source notes</a>.</p>"""
+    write(ctx, path, shell(path, "Methodology · Data Centers Near You",
+                           "Where the data comes from, how stages and distances work, what this site calculates "
+                           "itself, and known issues.", body, cfg))
+
+
+def downloads_record(reg):
+    return e(DEQ_RECORD.replace("&amp;", "&").format(reg))
 
 
 def legacy_redirects(ctx, pairs):
@@ -767,6 +1023,8 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg, fili
     front_door(ctx)
     about_page(ctx)
     privacy_page(ctx)
+    data_page(ctx)  # also writes the CSV downloads (pipeline/downloads.py), checked like the build's data
+    methodology_page(ctx)
     # forward the first version's addresses to the new ones
     old_new = [("browse/", f"{state}/browse/")]
     old_new += [(p.replace(f"{state}/", "", 1), p) for p in ctx["urls"]

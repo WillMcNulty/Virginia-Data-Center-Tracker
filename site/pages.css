@@ -85,3 +85,15 @@ code { font-family: var(--mono); font-size: 0.92em; }
 footer.band { font-size: 14px; color: var(--band-muted); }
 footer .wrap { padding-block: 22px 32px; }
 footer a { color: var(--band-ink); }
+/* /data/ and /methodology/: column tables and the embed code form */
+.cols { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 18px; display: block; overflow-x: auto; }
+.cols th, .cols td { text-align: left; vertical-align: top; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.cols th { font-size: 12.5px; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.04em; }
+.cols td:first-child { white-space: nowrap; }
+.embedform { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+.embedform fieldset { border: 0; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.embedform legend { font-weight: 600; margin-bottom: 6px; }
+.embedform .row { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.embedform input:not([type=radio]), .embedform select, .embedform textarea { font: inherit; font-size: 15px; padding: 5px 8px; border: 1px solid var(--axis); border-radius: 6px; background: var(--page); color: var(--ink); max-width: 100%; }
+.embedform textarea { display: block; width: 100%; box-sizing: border-box; font: 13px var(--mono); margin-top: 6px; }
+.embedform > label { font-weight: 600; }

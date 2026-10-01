@@ -389,6 +389,57 @@ class GeneratedPages(unittest.TestCase):
         self.assertIn(html_escape("County filing changed from “Site plan in review” to “Site plan approved”"), page)
         self.assertIn(f"2026-10-01-filing-status-{f['id']}", feed)
 
+    def test_csv_downloads_match_the_json(self):
+        import downloads
+        expected = {"data-centers": load("facilities"), "changes": load("changes")["events"],
+                    "county-filings": load("filings")}
+        for key, items in expected.items():
+            table = downloads.read(os.path.join(self.dir, "data", downloads.FILES[key].format(state="virginia")))
+            with self.subTest(key=key):
+                self.assertEqual(table[0], [c for c, _ in downloads.COLUMNS[key]])
+                self.assertEqual(len(table) - 1, len(items))
+                for c in table[0]:  # no personal-data fields (LOLA's AssignedTo, emails, phones, owners)
+                    self.assertNotRegex(c, downloads.PERSONAL_COLUMN)
+        dcs = downloads.read(os.path.join(self.dir, "data", "virginia-data-centers.csv"))
+        hdr = dcs[0]
+        carson_dc = next(r for r in dcs[1:] if r[0] == "74332")
+        self.assertEqual(carson_dc[hdr.index("latest_air_permit_date")], "2026-07-31")
+        self.assertIn("74332-2 (2026-07-31", carson_dc[hdr.index("air_permits")])
+        self.assertTrue(all(r[hdr.index("deq_record_url")].startswith(
+            "https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294/query?where=PLA_REG_NUM%3D")
+            for r in dcs[1:]))
+        fil = downloads.read(os.path.join(self.dir, "data", "virginia-county-filings.csv"))
+        by_id = {f["id"]: f for f in load("filings")}
+        for r in fil[1:]:  # descriptions and sources exactly as published in filings.json (already scrubbed)
+            row = dict(zip(fil[0], r))
+            self.assertEqual(row["description"], by_id[row["id"]]["description"])
+            self.assertEqual(row["source"], by_id[row["id"]]["source"])
+        # bytes on disk: UTF-8 without a BOM, CRLF rows (RFC 4180)
+        raw = open(os.path.join(self.dir, "data", "virginia-data-centers.csv"), "rb").read()
+        self.assertTrue(raw.startswith(b"deq_registration_number,") and b"\r\n" in raw)
+        raw.decode("utf-8")
+
+    def test_data_and_methodology_pages_are_linked(self):
+        sitemap = open(os.path.join(self.dir, "sitemap.xml"), encoding="utf-8").read()
+        for path in ("data/", "methodology/"):
+            self.assertIn(f"<loc>{self.cfg['site_url']}/{path}</loc>", sitemap)
+        data, meth = self.html["data/"], self.html["methodology/"]
+        for name in ("virginia-data-centers.csv", "virginia-changes.csv", "virginia-county-filings.csv"):
+            self.assertIn(f'href="{name}"', data)
+        self.assertIn("with attribution", data)
+        self.assertIn('id="embedform"', data)
+        self.assertIn(f'data-base="{self.cfg["site_url"]}/virginia/"', data)
+        for page in (self.html["about/"],):
+            self.assertIn('href="../data/"', page)
+            self.assertIn('href="../methodology/"', page)
+        for path, page in self.pages.items():  # footer on every generated page
+            up = "../" * path.count("/")
+            self.assertIn(f'<a href="{up}data/">Data</a>', page, path)
+            self.assertIn(f'<a href="{up}methodology/">Methodology</a>', page, path)
+        for text in ("Manassas", "74118", "haversine", "robots.txt", "In Review", "Loudoun only so far",
+                     "issued-air-permits-for-data-centers", "MapServer/294", "LOLA_DATA"):
+            self.assertIn(text, meth)
+
     def test_support_link_hidden_until_configured(self):
         if not self.cfg.get("support_url"):
             self.assertNotIn(self.cfg["support_label"], self.html["about/"])
@@ -437,6 +488,42 @@ class GeneratedPages(unittest.TestCase):
         self.assertLess(sum(sizes) / len(sizes), 20_000)
         for f in files[:25]:
             self.assertEqual(png_info(f), (1200, 630, 3), f)  # color type 3: palette
+
+
+class Downloads(unittest.TestCase):
+    """The CSV writer refuses files that don't match the JSON or that carry personal data."""
+
+    def setUp(self):
+        import tempfile
+        import downloads
+        self.d = downloads
+        self.dir = tempfile.mkdtemp()
+        self.fac = load("facilities")[:5]
+        self.fil = load("filings")[:5]
+        self.log = {"since": "2026-09-28", "events": [
+            {"date": "2026-10-01", "type": "filing-new", "id": self.fil[0]["id"], "name": self.fil[0]["name"],
+             "locality": "Loudoun County", "kind": "site-plan", "filing_type": "Site plan", "label": "Site plan in review"}]}
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.dir)
+
+    def test_writes_rows_with_sources(self):
+        files = self.d.write(self.dir, "virginia", self.fac, self.log, self.fil)
+        self.assertEqual({k: n for k, (_, n) in files.items()}, {"data-centers": 5, "changes": 1, "county-filings": 5})
+        rows = self.d.read(os.path.join(self.dir, "virginia-changes.csv"))
+        self.assertEqual(rows[1][2], "county-filing")
+        self.assertEqual(rows[1][-1], self.fil[0]["source"])
+
+    def test_refuses_personal_data(self):
+        bad = [dict(self.fil[0], description="Call the planner at jane.doe@loudoun.gov")]
+        with self.assertRaises(SystemExit):
+            self.d.write(self.dir, "virginia", self.fac, self.log, bad)
+
+    def test_refuses_a_row_count_mismatch(self):
+        files = self.d.write(self.dir, "virginia", self.fac, self.log, self.fil)
+        with self.assertRaises(SystemExit):
+            self.d.check(self.dir, files, {"data-centers": 6, "changes": 1, "county-filings": 5})
 
 
 class Cards(unittest.TestCase):
