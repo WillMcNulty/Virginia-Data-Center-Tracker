@@ -44,5 +44,14 @@ check("pin link parses", h3.mode === "pin" && h3.lat === 38.9 && h3.radius === 3
 const ring = circle(38.9, -77.4, 3).geometry.coordinates[0];
 check("circle points are 3 miles out", ring.every(([lon, lat]) => Math.abs(miles(38.9, -77.4, lat, lon) - 3) < 1e-6));
 
+// 7. County filings (the map's diamonds) work with the same search: all in Loudoun, found near a Loudoun ZIP.
+const filings = load("filings");
+check("county filings are present", filings.length > 50, String(filings.length));
+check("every filing is in Loudoun's extent with a county record link", filings.every((f) =>
+  f.lat >= 38.8 && f.lat <= 39.35 && f.lon >= -77.97 && f.lon <= -77.32 && f.source.startsWith("https://logis.loudoun.gov/")));
+const ashburn = within(filings, ...zips["20147"], 3);
+check("filings within 3 miles of ZIP 20147 (Ashburn), nearest first", ashburn.length > 0 && ashburn.every((f, i) => i === 0 || ashburn[i - 1].distance <= f.distance), String(ashburn.length));
+check("no filings near Carson Middle (Fairfax County)", within(filings, carson.lat, carson.lon, 1).length === 0);
+
 console.log(failed ? `${failed} FAILED` : "all passed");
 process.exit(failed ? 1 : 0);

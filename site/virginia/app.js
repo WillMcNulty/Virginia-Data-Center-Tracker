@@ -24,7 +24,11 @@ const addr = (f) => `${f.address || "Street address not listed by DEQ"}, ${f.cit
 
 const [facilities, schools, zips, meta] = await Promise.all(
   ["facilities", "schools", "zips", "meta"].map((n) => fetch(`data/${n}.json`).then((r) => r.json())));
+// County filings are optional: the map works without them (e.g. before the first build that writes the file).
+const filings = await fetch("data/filings.json").then((r) => (r.ok ? r.json() : [])).catch(() => []);
 const byId = new Map(facilities.map((f) => [String(f.id), f]));
+const filingById = new Map(filings.map((f) => [f.id, f]));
+const filingCounties = [...new Set(filings.map((f) => f.county))].sort().join(" and ");
 const schoolById = new Map(schools.map((s) => [s.id, s]));
 
 // ---- headline numbers -------------------------------------------------------------------------------------------
@@ -36,6 +40,8 @@ const schoolById = new Map(schools.map((s) => [s.id, s]));
     [String(meta.permits_by_year[snapYear] || 0), `Air permits issued in ${snapYear}`, `Through ${fmtDate(meta.permit_snapshot)}; ${meta.permits_by_year[String(snapYear - 1)] || 0} in all of ${snapYear - 1}`],
     [String(meta.stages.operating), "Operating", `${meta.localities[0][0]} has ${meta.localities[0][1]}`],
   ];
+  if (filings.length) stats.push([String(filings.filter((f) => f.status === "in-review").length), "County filings in review",
+    `${filingCounties} so far; ${filings.length} filings in all`]);
   $("#stats").replaceChildren(...stats.map(([v, l, n]) => { const d = el("div", { class: "stat" }); d.append(el("span", {}, l), el("b", {}, v), el("em", {}, n)); return d; }));
   $("#snap-date").textContent = fmtDate(meta.permit_snapshot);
   $("#built").textContent = new Date(meta.built_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
@@ -45,11 +51,12 @@ const schoolById = new Map(schools.map((s) => [s.id, s]));
 }
 
 // ---- state --------------------------------------------------------------------------------------------------------
-const state = { mode: "zip", center: null, label: null, radius: 3, stages: new Set(["planned", "construction", "operating", "shutdown", "other"]), recent: false };
+const state = { mode: "zip", center: null, label: null, radius: 3, stages: new Set(["planned", "construction", "operating", "shutdown", "other"]), recent: false, filings: true };
 const SIX_MONTHS_AGO = new Date(Date.now() - 183 * 864e5).toISOString().slice(0, 10);
 function visible() {
   return facilities.filter((f) => state.stages.has(f.stage) && (!state.recent || (f.latest_permit && f.latest_permit >= SIX_MONTHS_AGO)));
 }
+const visibleFilings = () => (state.filings ? filings : []);
 
 // ---- map ----------------------------------------------------------------------------------------------------------
 // theme.js (loaded in <head>) says whether the page is light or dark: Auto follows the device, or the viewer's pick.
@@ -62,11 +69,35 @@ map.fitBounds([[-83.7, 36.5], [-75.2, 39.5]], { padding: 20, animate: false });
 function geojson(list) {
   return { type: "FeatureCollection", features: list.map((f) => ({ type: "Feature", geometry: { type: "Point", coordinates: [f.lon, f.lat] }, properties: { id: String(f.id), stage: f.stage, order: 4 - STAGE_ORDER[f.stage] } })) };
 }
+function filingsGeojson(list) {
+  return { type: "FeatureCollection", features: list.map((f) => ({ type: "Feature", geometry: { type: "Point", coordinates: [f.lon, f.lat] }, properties: { id: f.id, status: f.status, order: f.status === "in-review" ? 1 : 0 } })) };
+}
+// Diamond marker images, drawn for the current theme: solid (decided), hollow (in county review), gray (denied).
+function diamond(fill, ring, hollow) {
+  const px = 2, size = 18 * px, c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d"), h = size / 2;
+  const dia = (r, color) => { g.beginPath(); g.moveTo(h, h - r); g.lineTo(h + r, h); g.lineTo(h, h + r); g.lineTo(h - r, h); g.closePath(); g.fillStyle = color; g.fill(); };
+  dia(h, ring); dia(h - 2.5 * px, fill);
+  if (hollow) dia(h - 6 * px, ring);
+  return { image: g.getImageData(0, 0, size, size), options: { pixelRatio: px } };
+}
 function addLayers() {
   const c = { op: css("--st-operating"), pl: css("--st-planned"), sd: css("--st-shutdown"), ring: isDark() ? "#0c0c0c" : "#ffffff", navy: isDark() ? "#aebdf0" : "#232d4b" };
   map.addSource("area", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   map.addLayer({ id: "area-fill", type: "fill", source: "area", paint: { "fill-color": c.navy, "fill-opacity": 0.07 } });
   map.addLayer({ id: "area-line", type: "line", source: "area", paint: { "line-color": c.navy, "line-width": 2, "line-dasharray": [2, 1.5] } });
+  const fil = css("--filing");
+  // Images can outlive a style swap (and replacing one in use blanks the layer), so each theme gets its own names.
+  const t = isDark() ? "dark" : "light";
+  for (const [name, img] of [["decided", diamond(fil, c.ring)], ["review", diamond(fil, c.ring, true)], ["denied", diamond(c.sd, c.ring)]])
+    if (!map.hasImage(`dia-${name}-${t}`)) map.addImage(`dia-${name}-${t}`, img.image, img.options);
+  // Under the data center dots (DEQ's records come first); the diamonds are drawn larger so their points show.
+  map.addSource("filings", { type: "geojson", data: filingsGeojson(visibleFilings()) });
+  map.addLayer({ id: "filings", type: "symbol", source: "filings", layout: {
+    "icon-image": ["match", ["get", "status"], "in-review", `dia-review-${t}`, "denied", `dia-denied-${t}`, `dia-decided-${t}`],
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.6, 10, 0.95, 14, 1.25],
+    "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "order"] } });
   map.addSource("dc", { type: "geojson", data: geojson(visible()) });
   map.addLayer({ id: "dc", type: "circle", source: "dc", layout: { "circle-sort-key": ["get", "order"] }, paint: {
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 10, 6.5, 14, 9],
@@ -82,11 +113,17 @@ map.on("style.load", addLayers);
 // Swap the basemap (and re-add the layers in the new theme's colors) when the theme changes.
 window.addEventListener("themechange", () => map.setStyle(styleUrl()));
 
-map.on("mouseenter", "dc", () => { map.getCanvas().style.cursor = "pointer"; });
-map.on("mouseleave", "dc", () => { map.getCanvas().style.cursor = state.mode === "pin" ? "crosshair" : ""; });
+for (const layer of ["dc", "filings"]) {
+  map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
+  map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = state.mode === "pin" ? "crosshair" : ""; });
+}
 map.on("click", (e) => {
-  const hit = map.queryRenderedFeatures(e.point, { layers: ["dc"] });
-  if (hit.length) { openPopup(byId.get(hit[0].properties.id)); return; }
+  const hit = map.queryRenderedFeatures(e.point, { layers: ["dc", "filings"] });  // topmost first
+  if (hit.length) {
+    const p = hit[0].properties;
+    if (hit[0].layer.id === "filings") openFilingPopup(filingById.get(p.id)); else openPopup(byId.get(p.id));
+    return;
+  }
   if (state.mode === "pin") setCenter(e.lngLat.lat, e.lngLat.lng, `your pin (${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)})`, { pin: `${e.lngLat.lat.toFixed(5)},${e.lngLat.lng.toFixed(5)}` });
 });
 
@@ -110,12 +147,35 @@ function openPopup(f, fly) {
   src.append(document.createTextNode("Source: "), el("a", { href: DEQ_RECORD(f.id), target: "_blank", rel: "noopener" }, `DEQ record ${f.id}`),
     document.createTextNode(" · "), el("a", { href: meta.sources.deq_permit_page, target: "_blank", rel: "noopener" }, "DEQ permit list"));
   box.append(src);
+  showPopup(f, box, fly);
+}
+function showPopup(f, box, fly) {
   popup?.remove();
   // On narrow screens, size the popup to the map and center the point so the popup can't run off the edge.
   const w = map.getContainer().clientWidth;
   if (w < 560 && !fly) map.easeTo({ center: [f.lon, f.lat], offset: [0, 90], duration: 300 });
   popup = new Popup({ offset: 10, maxWidth: Math.min(310, w - 40) + "px", anchor: w < 560 ? "bottom" : undefined })
     .setLngLat([f.lon, f.lat]).setDOMContent(box).addTo(map);
+}
+// A county filing: what was filed, its status in the county's words, and a link to the county record.
+function openFilingPopup(f, fly) {
+  if (!f) return;
+  if (fly) map.flyTo({ center: [f.lon, f.lat], zoom: Math.max(map.getZoom(), 13), offset: map.getContainer().clientWidth < 560 ? [0, 90] : [0, 0] });
+  const box = el("div", { class: "pop" });
+  box.append(el("h3", {}, f.name));
+  const st = el("p"); st.append(el("span", { class: "tag filing" }, f.label), document.createTextNode(" County status"));
+  box.append(st);
+  box.append(el("p", {}, `${f.type} ${f.id}, filed ${fmtDate(f.date)} · ${f.county}`));
+  if (state.center) box.append(el("p", {}, `${fmtMi(miles(state.center.lat, state.center.lon, f.lat, f.lon))} from ${state.label}`));
+  if (f.description) box.append(el("p", {}, f.description.length > 280 ? f.description.slice(0, 280).replace(/\s+\S*$/, "") + "…" : f.description));
+  if (f.related?.length) box.append(el("p", {}, "Filed with it: " + f.related.join(", ")));
+  box.append(el("p", { class: "src" }, f.kind === "land-use"
+    ? "A land-use application: the county board decides, usually after a public hearing."
+    : "A site plan: construction plans reviewed by county staff."));
+  const src = el("p", { class: "src" });
+  src.append(document.createTextNode("Source: "), el("a", { href: f.source, target: "_blank", rel: "noopener" }, `${f.county} record ${f.id}`));
+  box.append(src);
+  showPopup(f, box, fly);
 }
 
 // ---- search -------------------------------------------------------------------------------------------------------
@@ -161,6 +221,8 @@ $("#stage-filter").addEventListener("change", () => {
   refresh();
 });
 $("#recent").addEventListener("change", () => { state.recent = $("#recent").checked; refresh(); });
+$("#show-filings").addEventListener("change", () => { state.filings = $("#show-filings").checked; refresh(); });
+if (!filings.length) $("#show-filings").closest("div").hidden = true;
 
 function selectZip(z) {
   const ll = zips[z];
@@ -184,6 +246,7 @@ function syncHash() {
 
 function refresh() {
   if (map.getSource("dc")) map.getSource("dc").setData(geojson(visible()));
+  if (map.getSource("filings")) map.getSource("filings").setData(filingsGeojson(visibleFilings()));
   drawSearch(false);
 }
 
@@ -192,8 +255,8 @@ function drawSearch(fit) {
   if (!state.center) {
     map.getSource("area").setData({ type: "FeatureCollection", features: [] });
     map.getSource("center").setData({ type: "FeatureCollection", features: [] });
-    const n = visible().length;
-    $("#summary").textContent = `Showing all ${n} on the map. Pick a ZIP code, school or pin to list what's nearby.`;
+    const n = visible().length, nf = visibleFilings().length;
+    $("#summary").textContent = `Showing all ${n} data centers${nf ? ` and ${nf} county filings` : ""} on the map. Pick a ZIP code, school or pin to list what's nearby.`;
     $("#results").replaceChildren();
     return;
   }
@@ -209,15 +272,26 @@ function drawSearch(fit) {
   const counts = {};
   for (const f of near) counts[f.stage] = (counts[f.stage] || 0) + 1;
   const parts = Object.keys(STAGE_ORDER).filter((k) => counts[k]).map((k) => `${counts[k]} ${STAGE_LABEL[k].toLowerCase()}`);
+  const nearFilings = within(visibleFilings(), lat, lon, state.radius);
+  const inReview = nearFilings.filter((f) => f.status === "in-review").length;
+  const filingText = nearFilings.length ? ` Plus ${nearFilings.length} county filing${nearFilings.length > 1 ? "s" : ""} (${inReview} in county review).` : "";
   const s = $("#summary");
   s.replaceChildren(el("b", {}, String(near.length)), document.createTextNode(
-    ` within ${state.radius} mile${state.radius > 1 ? "s" : ""} of ${state.label}` + (parts.length ? `: ${parts.join(", ")}.` : ".")));
-  $("#results").replaceChildren(...near.map((f) => {
+    ` data center${near.length === 1 ? "" : "s"} within ${state.radius} mile${state.radius > 1 ? "s" : ""} of ${state.label}` + (parts.length ? `: ${parts.join(", ")}.` : ".") + filingText));
+  // Data centers and county filings in one list, nearest first; the marker shape and the text say which is which.
+  const rows = [...near.map((f) => ({ f, filing: false })), ...nearFilings.map((f) => ({ f, filing: true }))]
+    .sort((a, b) => a.f.distance - b.f.distance);
+  $("#results").replaceChildren(...rows.map(({ f, filing }) => {
     const li = el("li"); const b = el("button", { type: "button" });
-    b.append(el("i", { class: "dot " + f.stage, "aria-hidden": "true" }), el("span", { class: "nm" }, f.name), el("span", { class: "dist" }, fmtMi(f.distance)));
-    const date = f.latest_permit ? ` · permit ${fmtDate(f.latest_permit)}` : "";
-    b.append(el("span", { class: "meta" }, `${STAGE_LABEL[f.stage]} · ${addr(f)}${date}`));
-    b.addEventListener("click", () => openPopup(f, true));
+    b.append(el("i", { class: (filing ? "dia " + f.status : "dot " + f.stage), "aria-hidden": "true" }), el("span", { class: "nm" }, f.name), el("span", { class: "dist" }, fmtMi(f.distance)));
+    if (filing) {
+      b.append(el("span", { class: "meta" }, `County filing · ${f.label} · ${f.type} ${f.id}, filed ${fmtDate(f.date)}`));
+      b.addEventListener("click", () => openFilingPopup(f, true));
+    } else {
+      const date = f.latest_permit ? ` · permit ${fmtDate(f.latest_permit)}` : "";
+      b.append(el("span", { class: "meta" }, `${STAGE_LABEL[f.stage]} · ${addr(f)}${date}`));
+      b.addEventListener("click", () => openPopup(f, true));
+    }
     li.append(b); return li;
   }));
 }

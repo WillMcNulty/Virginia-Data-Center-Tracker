@@ -12,7 +12,13 @@
   /* Same design language as willmcnulty.github.io and the UVA Capital Plan Tracker. Map marker colors were checked
      for colorblind separation (every pair, since any two points can sit side by side) against the basemap
      backgrounds: #495e9d / #e57200 on #f2f3f0 (light) and #6f86e0 / #d0650a on #0c0c0c (dark). Stage is never
-     shown by color alone: markers carry a white ring, and every list and popup spells the stage out. */
+     shown by color alone: markers carry a white ring, and every list and popup spells the stage out.
+     County filings are diamonds (a second shape, so never color alone either): violet #b44ee8 on light, yellow
+     #f0e442 on dark. Checked the same way, pairwise against every marker color including the gray (#8a8f98) and
+     the navy search-center dot, with Machado 2009 protan/deutan/tritan simulation and OKLab distance (x100):
+     light, worst pair #b44ee8 vs #495e9d: 21.2 normal, 12.4 protan, 13.8 deutan; tritan >= 11.0 for every pair;
+     3.6:1 against #f2f3f0. Dark, worst pair #f0e442 vs #aebdf0: 26.4 normal, 26.2 protan, 26.4 deutan, 14.1
+     tritan; 14.8:1 against #0c0c0c. (Violet fails next to the dark theme's light navy, hence the yellow there.) */
   :root {
     color-scheme: light;
     --page: #f6f7fb; --surface: #ffffff; --ink: #141b33; --ink-2: #4d5876; --muted: #667091;
@@ -20,7 +26,7 @@
     --navy: #232d4b; --orange: #e57200; --orange-ink: #141b33; --orange-tint: #fff0df; --blue-tint: #e6ebf6;
     --band: #232d4b; --band-ink: #ffffff; --band-muted: #c6cfe8; --link: #232d4b;
     --wash: rgba(35, 45, 75, 0.05);
-    --st-operating: #495e9d; --st-planned: #e57200; --st-shutdown: #8a8f98;
+    --st-operating: #495e9d; --st-planned: #e57200; --st-shutdown: #8a8f98; --filing: #b44ee8;
     --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
     --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
     --mono: "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
@@ -33,7 +39,7 @@
       --line: #2b3454; --grid: #232b45; --axis: #34406a;
       --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
       --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5; --wash: rgba(174, 189, 240, 0.07);
-      --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98;
+      --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98; --filing: #f0e442;
     }
   }
   :root[data-theme="dark"] {
@@ -42,7 +48,7 @@
     --line: #2b3454; --grid: #232b45; --axis: #34406a;
     --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
     --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5; --wash: rgba(174, 189, 240, 0.07);
-    --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98;
+    --st-operating: #6f86e0; --st-planned: #d0650a; --st-shutdown: #8a8f98; --filing: #f0e442;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.55 var(--sans); }
@@ -117,6 +123,12 @@
   .dot.operating { background: var(--st-operating); }
   .dot.shutdown, .dot.other { background: var(--st-shutdown); }
   .dot.construction { background: radial-gradient(circle, var(--surface) 0 2px, var(--st-planned) 2.5px); }
+  /* County filings: a diamond, solid once decided, hollow while in county review. */
+  .dia { width: 10px; height: 10px; margin: 5px 1px 0; transform: rotate(45deg); background: var(--filing); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--axis); }
+  .dia.in-review { background: var(--surface); border: 3px solid var(--filing); }
+  .dia.denied { background: var(--st-shutdown); }
+  .legend .dia { margin: 0 2px; }
+  .tag.filing { background: none; border: 1px solid var(--axis); color: var(--ink); }
   .tag { display: inline-block; font: 700 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--blue-tint); color: var(--navy); }
   .tag.planned, .tag.construction { background: var(--orange-tint); color: var(--ink); }
 
@@ -209,6 +221,9 @@
           <div class="checks" style="margin-top:6px">
             <label><input type="checkbox" id="recent"> Only those with an air permit issued in the last 6 months</label>
           </div>
+          <div class="checks" style="margin-top:6px">
+            <label><input type="checkbox" id="show-filings" checked> County filings (Loudoun so far)</label>
+          </div>
         </fieldset>
         <p class="summary" id="summary" aria-live="polite"></p>
         <ul class="results" id="results"></ul>
@@ -221,6 +236,8 @@
           <span><i class="dot construction"></i> Under construction</span>
           <span><i class="dot operating"></i> Operating</span>
           <span><i class="dot shutdown"></i> Shut down</span>
+          <span><i class="dia in-review"></i> County filing in review</span>
+          <span><i class="dia approved"></i> County filing decided</span>
         </div>
       </section>
     </div>
@@ -233,12 +250,17 @@
           point they apply for one. The stage (planned, under construction, operating) is DEQ's own.</p>
         <p>Air permit dates come from DEQ's <a href="https://www.deq.virginia.gov/news-info/shortcuts/permits/air/issued-air-permits-for-data-centers">issued-permits list</a>,
           saved <span id="snap-date"></span>. Sites DEQ has on record but hasn't issued a permit for yet show no date.</p>
+        <p>Diamonds are county filings that mention a data center: land-use applications (rezonings, special
+          exceptions), which the county board decides, usually after a public hearing, and site plans, which county
+          staff review. They come before any DEQ air permit. Loudoun County's come from its
+          <a href="https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0">land application records</a> (LOLA);
+          the status is the county's own, and each links to its county record.</p>
       </div>
       <div class="card">
         <h2>What it doesn't show yet</h2>
         <ul>
-          <li><b>Earlier proposals.</b> A rezoning or special exception is filed with the county before any air permit,
-            so the newest proposals may not be here yet. County records are the next thing to add.</li>
+          <li><b>Other counties' filings.</b> County filings are shown for Loudoun County so far; elsewhere, a proposal
+            appears only once it applies for a DEQ air permit. Fairfax and Prince William are next.</li>
           <li><b>Cost and size.</b> These come from county building permits, also next.</li>
           <li><b>Meetings and how to take part.</b> Upcoming hearings, comment periods and who decides, by ZIP code, are planned.</li>
         </ul>
@@ -247,6 +269,7 @@
         <h2>Sources and related work</h2>
         <ul>
           <li>Virginia Department of Environmental Quality: Air Sites (Daily) and the issued air permits list.</li>
+          <li>County filings: Loudoun County's Loudoun Online Land Applications (LOLA) records.</li>
           <li>Schools: National Center for Education Statistics, public school locations 2024-25.</li>
           <li>ZIP codes: U.S. Census Bureau ZIP Code Tabulation Areas (2025 Gazetteer).</li>
           <li>Map: <a href="https://openfreemap.org/">OpenFreeMap</a>, © OpenMapTiles, data © OpenStreetMap contributors.

@@ -8,6 +8,7 @@ Writes:
   site/virginia/data/schools.json     Virginia public schools (landmark search)
   site/virginia/data/zips.json        Virginia ZIP code center points (ZIP search)
   site/virginia/data/meta.json        counts, build time, sources, DEQ's data disclaimer
+  site/virginia/data/filings.json     county filings that mention a data center (Loudoun so far; optional source)
 
 Refuses to write anything if the data looks broken (see check()), so a source outage can't publish an empty map.
 """
@@ -24,6 +25,7 @@ from collections import Counter
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "pipeline"))
 import changes  # noqa: E402
+import filings  # noqa: E402
 import geo  # noqa: E402
 import pages  # noqa: E402
 import sources  # noqa: E402
@@ -192,6 +194,43 @@ def check(facilities, schools, zips, meta):
         raise SystemExit("build check failed:\n  " + "\n  ".join(problems))
 
 
+# County filings: (county, cache file, fetcher, adapter). Each is optional: see build_filings().
+FILING_SOURCES = [("Loudoun County", "loudoun_lola.json", sources.loudoun_filings, filings.loudoun)]
+FILINGS = os.path.join(OUT, "filings.json")
+
+
+def build_filings(offline=False):
+    """County filings, one county source at a time. Never stops the build: when a county's server is down (LOLA
+    sometimes answers with an HTML error page) or its data fails filings.problems(), that county keeps the filings
+    published last time (the committed filings.json), so broken data is never published and nothing disappears.
+    Returns (filings, the previously published filings, {county: status})."""
+    before = json.load(open(FILINGS, encoding="utf-8")) if os.path.exists(FILINGS) else []
+    rings = {locality_label(c["attributes"]["NAME"], c["attributes"]["FIPS"]): c["geometry"]["rings"]
+             for c in json.load(open(os.path.join(CACHE, "deq_counties.json"), encoding="utf-8"))}
+
+    def inside(county, lon, lat):
+        return county in rings and geo.in_esri_polygon(lon, lat, rings[county])
+
+    out, status = [], {}
+    for county, cache_name, fetch, adapt in FILING_SOURCES:
+        prev = [f for f in before if f["county"] == county]
+        try:
+            new = adapt(cached(cache_name, fetch, offline))
+            bad = filings.problems(new, prev, inside)
+        except Exception as ex:  # server down, HTML instead of JSON, changed fields: keep the last good copy
+            bad = [f"{county} source unavailable ({type(ex).__name__}: {str(ex)[:120]})"]
+        if bad:
+            print(f"warning: {county} filings not updated; keeping the {len(prev)} published before:\n  "
+                  + "\n  ".join(bad[:8]))
+            out += prev
+            status[county] = {"updated": False, "filings": len(prev), "problem": bad[0]}
+        else:
+            out += new
+            status[county] = {"updated": True, "filings": len(new)}
+    out.sort(key=lambda r: (r["date"], r["id"]), reverse=True)
+    return out, before, status
+
+
 def write(facilities, schools, zips, meta):
     os.makedirs(OUT, exist_ok=True)
     for name, obj in [("facilities", facilities), ("schools", schools), ("zips", zips), ("meta", meta)]:
@@ -205,21 +244,30 @@ if __name__ == "__main__":
     ap.add_argument("--offline", action="store_true")
     args = ap.parse_args()
     fac, sch, zp, meta = build(offline=args.offline)
+    fil, fil_before, meta["filings"] = build_filings(offline=args.offline)
+    meta["sources"]["loudoun_lola"] = sources.LOUDOUN_LOLA
     # Change log: compare with the facility list already committed, before overwriting it.
     prev_path = os.path.join(OUT, "facilities.json")
     before = json.load(open(prev_path, encoding="utf-8")) if os.path.exists(prev_path) else None
     # Offline builds use cached (possibly days-old) source data, so they never add to the change log.
     log, added = changes.update(os.path.join(OUT, "changes.json"), None if args.offline else before, fac,
                                 dt.date.today().isoformat())
+    # New county filings and status changes (not on the first run, when there's no previous list to compare with).
+    if not args.offline and fil_before:
+        added += changes.add(log, filings.diff(fil_before, fil, dt.date.today().isoformat()))
     write(fac, sch, zp, meta)
+    with open(FILINGS, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(fil, fh, ensure_ascii=False, indent=0)
+        fh.write("\n")
     with open(os.path.join(OUT, "changes.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(log, fh, ensure_ascii=False, indent=1)
         fh.write("\n")
     print(f"change log: {len(added)} new event(s) today; {len(log['events'])} since {log['since']}")
-    counts = pages.build_pages(SITE, STATE, fac, sch, zp, meta, log, CONFIG)
+    counts = pages.build_pages(SITE, STATE, fac, sch, zp, meta, log, CONFIG, filings=fil)
     print(f"pages: {counts['localities']} counties/cities, {counts['zips']} ZIP codes, {counts['schools']} schools, "
           f"{counts['facilities']} data centers ({counts['total']} total) + sitemap, RSS")
     print(f"{meta['facilities']} data centers {meta['stages']}; {meta['schools']} schools; {meta['zips']} ZIPs; "
           f"permit snapshot {meta['permit_snapshot']} ({meta['permits_in_snapshot']} permits, "
           f"{meta['facilities_without_permit_row']} facilities not on the list yet)")
     print("top localities:", meta["localities"][:6])
+    print("county filings:", {c: (v["filings"], "updated" if v["updated"] else "kept previous") for c, v in meta["filings"].items()})

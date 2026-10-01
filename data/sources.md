@@ -36,6 +36,25 @@ Checked 2026-09-27 and 2026-09-28.
   Prince William County by these boundaries (confirmed with DEQ's own server-side spatial query), but DEQ's permit
   list says Manassas City. The site shows both rather than pick one.
 
+## Loudoun County: Loudoun Online Land Applications (LOLA)
+
+- `https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0`, queried for applications whose name
+  or description mentions "data center" or "datacenter" (508 records on 2026-09-30). Fields requested: `PlanNumber`,
+  `PlanApplicationDate`, `PlanType`, `PlanStatus`, `PlanName`, `PlanDescription` and the parcel outline. The
+  staff-assignment fields (a reviewer's name and email) are never requested.
+- `pipeline/filings.py` keeps land-use applications (legislative applications, rezonings, special exceptions,
+  concept plan amendments, commission permits) and site plans (engineering plans), drops paperwork (bonds, plats,
+  studies, correspondence) and decided applications filed before 2021, and folds "SEE LEGI-... FOR DOCUMENTS"
+  sub-applications into their umbrella: 173 filings on 2026-09-30 (78 in review, 95 approved). Each point is the
+  center of the application's parcel outline; each links to its record on the county's server.
+- **Personal data:** descriptions often end with the reviewing planner's initials, and some name an attorney or an
+  owner; initials and review-session numbers are stripped, descriptions that name someone "on behalf of" an owner
+  are replaced with a pointer to the county record, and one plan name that is a private person's name is withheld.
+- **Limits:** the server is sometimes down (it answers with an HTML error page). The build then keeps the last
+  published filings (`site/virginia/data/filings.json`), as it does when the data fails its checks (far fewer
+  filings than last time, points outside Loudoun, missing fields). Statuses are the county's; a few old
+  applications still show "In Review" years later.
+
 ## National Center for Education Statistics: public school locations
 
 - `https://nces.ed.gov/opengis/rest/services/K12_School_Locations/EDGE_GEOCODE_PUBLICSCH_2425/MapServer/0`,
