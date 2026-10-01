@@ -37,7 +37,10 @@ pipeline/pages.py        static pages: front door, /virginia/{places,zip,schools
 pipeline/cards.py        link-preview images (og:image) per page, Pillow; also the 1080x1350 Instagram variant
 pipeline/social.py       weekly social drafts (FB/Bluesky/Instagram) -> drafts/social/<date>/ (gitignored); never posts; run by hand
 pipeline/changes.py      change log (site/virginia/data/changes.json, committed) -> "New this week" + RSS
-pipeline/filings.py      county filings (Loudoun LOLA so far): NOT YET WIRED INTO build.py / the map (backlog T1)
+pipeline/filings.py      county filings (Loudoun LOLA so far) -> site/virginia/data/filings.json, map diamonds, page sections;
+                         schema in its docstring; adapters plug into build.FILING_SOURCES
+pipeline/civic.py        county meetings with data center items (Granicus agendas) + data/participation.json; obeys
+                         robots.txt (all three hosts disallow bots), so meetings.json is refreshed by hand (--saved DIR)
 site/virginia/index.html + app.js   the map app (MapLibre from site/vendor, OpenFreeMap tiles)
 site/geo.js, theme.js, pages.css    shared by all pages; theme.js = Auto/Light/Dark switcher shared across the owner's sites
 data/                    site_config.json (site_url, hidden support_url), DEQ permit snapshot, school aliases, sources.md

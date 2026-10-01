@@ -1,0 +1,69 @@
+<?xml version="1.0" ?>
+<?xml-stylesheet href="browserfriendlyRSS_Layout.xslt" type="text/xsl" media="screen"?>
+<rss version="2.0" 
+    xmlns:dc="https://purl.org/dc/elements/1.1/" 
+    xmlns:gran="https://www.granicus.com/schema/rss-supplements" >
+<channel>
+  <title>Fairfax County, VA: Board of Supervisors (Agenda Feed)</title>
+  <gran:sourceURL>https://video.fairfaxcounty.gov/ViewPublisherRSS.php?view_id=7&amp;mode=agendas</gran:sourceURL>
+  <link>https://video.fairfaxcounty.gov/ViewPublisher.php?view_id=7</link>
+  <description></description>
+  <language>en-us</language>
+<item>
+  <guid isPermaLink="false">62dd6c2a-bce2-11f1-89ef-005056a84798</guid>
+  <title>September 29, 2026 Board of Supervisors Meeting (Spanish Captions) - Sep 29, 2026</title>
+  <pubDate>Tue, 29 Sep 2026 06:45:00 -0800</pubDate>
+  <gran:pubDateParts yr='2026' mo='09' day='29' hr='06' min='45' sec='0' tz='7' />
+  <link>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4263</link>
+  <description>
+    <![CDATA[
+      <p style='margin-top:2px;'>
+The agenda for September 29, 2026 Board of Supervisors Meeting (Spanish Captions) dated Tuesday, 29 September 2026  has been archived. Access it here:<br />      <a href="https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4263" style='margin-right:50px;'>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4263</a>
+      </p>
+    ]]>
+  </description>
+</item>
+<item>
+  <guid isPermaLink="false">5fb3de28-0249-46e6-a026-99144f302bf7</guid>
+  <title>September 29, 2026 Board of Supervisors Meeting - Sep 29, 2026</title>
+  <pubDate>Tue, 29 Sep 2026 06:45:00 -0800</pubDate>
+  <gran:pubDateParts yr='2026' mo='09' day='29' hr='06' min='45' sec='0' tz='7' />
+  <link>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4260</link>
+  <description>
+    <![CDATA[
+      <p style='margin-top:2px;'>
+The agenda for September 29, 2026 Board of Supervisors Meeting dated Tuesday, 29 September 2026  has been archived. Access it here:<br />      <a href="https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4260" style='margin-right:50px;'>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4260</a>
+      </p>
+    ]]>
+  </description>
+</item>
+<item>
+  <guid isPermaLink="false">9903c569-b38e-11f1-a7dc-005056a89546</guid>
+  <title>September 15, 2026 Board of Supervisors Meeting (Spanish Captions) - Sep 15, 2026</title>
+  <pubDate>Tue, 15 Sep 2026 06:45:00 -0800</pubDate>
+  <gran:pubDateParts yr='2026' mo='09' day='15' hr='06' min='45' sec='0' tz='7' />
+  <link>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4247</link>
+  <description>
+    <![CDATA[
+      <p style='margin-top:2px;'>
+The agenda for September 15, 2026 Board of Supervisors Meeting (Spanish Captions) dated Tuesday, 15 September 2026  has been archived. Access it here:<br />      <a href="https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4247" style='margin-right:50px;'>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4247</a>
+      </p>
+    ]]>
+  </description>
+</item>
+<item>
+  <guid isPermaLink="false">daf4b632-61c4-404e-946b-e6178b9719a8</guid>
+  <title>September 15, 2026 Board of Supervisors Meeting - Sep 15, 2026</title>
+  <pubDate>Tue, 15 Sep 2026 06:45:00 -0800</pubDate>
+  <gran:pubDateParts yr='2026' mo='09' day='15' hr='06' min='45' sec='0' tz='7' />
+  <link>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4241</link>
+  <description>
+    <![CDATA[
+      <p style='margin-top:2px;'>
+The agenda for September 15, 2026 Board of Supervisors Meeting dated Tuesday, 15 September 2026  has been archived. Access it here:<br />      <a href="https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4241" style='margin-right:50px;'>https://video.fairfaxcounty.gov/AgendaViewer.php?view_id=7&amp;clip_id=4241</a>
+      </p>
+    ]]>
+  </description>
+</item>
+</channel>
+</rss>

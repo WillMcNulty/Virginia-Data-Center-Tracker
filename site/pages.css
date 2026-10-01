@@ -46,6 +46,7 @@ a:hover { color: var(--orange); }
 main { padding-block: 26px 36px; }
 h1 { font: 600 clamp(26px, 4.5vw, 38px)/1.15 var(--serif); color: var(--navy); margin: 6px 0 12px; }
 h2 { font: 800 12.5px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); margin: 26px 0 8px; }
+h3 { font: 700 15.5px var(--sans); color: var(--ink); margin: 18px 0 6px; }
 .lede { font-size: 17px; max-width: 70ch; }
 .crumbs { font-size: 13.5px; color: var(--ink-2); margin: 0; }
 .note { font-size: 13.5px; color: var(--ink-2); border-left: 3px solid var(--orange); padding-left: 12px; max-width: 75ch; }
