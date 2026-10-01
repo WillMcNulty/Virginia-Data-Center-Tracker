@@ -5,8 +5,9 @@
   <state>-county-filings.csv  one row per county filing (site/<state>/data/filings.json; schema in filings.py)
 
 Columns are stable: add new ones at the end, never rename or reorder (people's spreadsheets depend on them). Each
-column's meaning is in COLUMNS and printed on the /data/ page. Every row carries the official source URL. UTF-8,
-RFC 4180 quoting (the csv module), CRLF line endings as the RFC says. No personal data: the inputs carry none
+column's meaning is in COLUMNS and printed on the /data/ page. Every row carries the official source URL. UTF-8
+with a byte-order mark (so Excel on Windows reads it as UTF-8 instead of guessing Windows-1252 and garbling
+characters like the en dash in "CyrusOne – NVA14"; Python's "utf-8-sig", pandas and R's readr skip it), RFC 4180 quoting (the csv module), CRLF line endings as the RFC says. No personal data: the inputs carry none
 (filings.py scrubs descriptions; LOLA's staff-assignment fields are never fetched), and check() refuses a file
 with a column or a value that looks like one.
 """
@@ -114,7 +115,7 @@ def write(out_dir, state, facilities, log, filings):
     written = {}
     for key, gen in rows.items():
         name = FILES[key].format(state=state)
-        with open(os.path.join(out_dir, name), "w", encoding="utf-8", newline="") as fh:
+        with open(os.path.join(out_dir, name), "w", encoding="utf-8-sig", newline="") as fh:  # BOM: see docstring
             w = csv.writer(fh)  # default dialect: RFC 4180 quoting, \r\n line endings
             w.writerow([c for c, _ in COLUMNS[key]])
             n = 0
@@ -128,7 +129,7 @@ def write(out_dir, state, facilities, log, filings):
 
 
 def read(path):
-    with open(path, encoding="utf-8", newline="") as fh:
+    with open(path, encoding="utf-8-sig", newline="") as fh:
         return list(csv.reader(fh))
 
 

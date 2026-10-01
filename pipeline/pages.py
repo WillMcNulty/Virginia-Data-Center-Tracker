@@ -790,7 +790,7 @@ def data_page(ctx):
         return f'<li><a href="{e(name)}" download>{e(name)}</a> <span class="when">{plural(n, "row")}, {max(1, round(size / 1024))} KB</span>: {what}</li>'
     radius = "".join(f'<option value="{r}"{" selected" if r == 3 else ""}>{plural(r, "mile")}</option>' for r in RADII)
     body = f"""    <h1>Data downloads</h1>
-    <p class="lede">The data behind the map, as spreadsheets (CSV, UTF-8). Built {built} from the official records
+    <p class="lede">The data behind the map, as spreadsheets (CSV, UTF-8 with a byte-order mark so Excel shows accented characters and dashes correctly). Built {built} from the official records
       described in the <a href="{up}methodology/">methodology</a>; the files are rebuilt every morning with the map.</p>
     <ul class="plain">
       {dl("data-centers", f"every data center on Virginia DEQ's records ({meta['facilities']} today), with stage, address, locality and issued air permits (DEQ's permit list as of {fmt_date(meta.get('permit_snapshot'))}).")}

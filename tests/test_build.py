@@ -1,4 +1,5 @@
 """Tests for the pipeline and the built data. Run: python -m unittest discover tests"""
+import codecs
 import json
 import os
 import sys
@@ -414,10 +415,14 @@ class GeneratedPages(unittest.TestCase):
             row = dict(zip(fil[0], r))
             self.assertEqual(row["description"], by_id[row["id"]]["description"])
             self.assertEqual(row["source"], by_id[row["id"]]["source"])
-        # bytes on disk: UTF-8 without a BOM, CRLF rows (RFC 4180)
+        # bytes on disk: UTF-8 with one byte-order mark (so Excel reads it as UTF-8), CRLF rows (RFC 4180)
+        for name in ("virginia-data-centers.csv", "virginia-changes.csv", "virginia-county-filings.csv"):
+            raw = open(os.path.join(self.dir, "data", name), "rb").read()
+            self.assertTrue(raw.startswith(codecs.BOM_UTF8) and not raw.startswith(codecs.BOM_UTF8 * 2), name)
+            self.assertIn(b"\r\n", raw)
+            raw.decode("utf-8-sig")
         raw = open(os.path.join(self.dir, "data", "virginia-data-centers.csv"), "rb").read()
-        self.assertTrue(raw.startswith(b"deq_registration_number,") and b"\r\n" in raw)
-        raw.decode("utf-8")
+        self.assertTrue(raw.startswith(codecs.BOM_UTF8 + b"deq_registration_number,"))
 
     def test_data_and_methodology_pages_are_linked(self):
         sitemap = open(os.path.join(self.dir, "sitemap.xml"), encoding="utf-8").read()
