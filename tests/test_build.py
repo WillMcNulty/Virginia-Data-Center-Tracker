@@ -13,6 +13,12 @@ import geo  # noqa: E402
 DATA = os.path.join(ROOT, "site", "virginia", "data")
 
 
+def dt_ms(y, m, d):
+    """An ArcGIS date: milliseconds since 1970, UTC."""
+    import datetime
+    return int(datetime.datetime(y, m, d, 12, tzinfo=datetime.timezone.utc).timestamp() * 1000)
+
+
 def load(name):
     return json.load(open(os.path.join(DATA, f"{name}.json"), encoding="utf-8"))
 
@@ -108,11 +114,147 @@ class ChangeLog(unittest.TestCase):
     def test_committed_log_is_valid(self):
         log = load("changes")
         self.assertRegex(log["since"], r"^\d{4}-\d{2}-\d{2}$")
-        ids = {f["id"] for f in load("facilities")}
+        ids = {f["id"] for f in load("facilities")} | {f["id"] for f in load("filings")}
         for ev in log["events"]:
-            self.assertIn(ev["type"], {"new", "stage", "permit", "renamed", "removed"})
+            self.assertIn(ev["type"], {"new", "stage", "permit", "renamed", "removed", "filing-new", "filing-status"})
             if ev["type"] != "removed":
                 self.assertIn(ev["id"], ids)
+
+
+def lola(number, plan_type="Engineering Plan", status="In Review", when=None, name="Test Center",
+         desc="Two data center buildings.", ring=None):
+    """A raw LOLA feature, as the ArcGIS service returns it."""
+    ring = ring or [[-77.50, 39.00], [-77.49, 39.00], [-77.49, 39.01], [-77.50, 39.01], [-77.50, 39.00]]
+    return {"attributes": {"PlanNumber": number, "PlanApplicationDate": when or dt_ms(2026, 9, 1), "PlanType": plan_type,
+                           "PlanStatus": status, "PlanName": name, "PlanDescription": desc},
+            "geometry": {"rings": [ring]}}
+
+
+class Filings(unittest.TestCase):
+    """County filings (pipeline/filings.py) and how the build publishes them."""
+
+    def test_scrub_removes_staff_initials_and_review_sessions(self):
+        import filings
+        self.assertEqual(filings.scrub("TWO BUILDINGS IN THE (PDIP) ZONING DISTRICT. AM"),
+                         "TWO BUILDINGS IN THE (PDIP) ZONING DISTRICT.")
+        self.assertEqual(filings.scrub("ZONING DISTRICT. JAB STMP-2022-0006."), "ZONING DISTRICT. STMP-2022-0006.")
+        self.assertEqual(filings.scrub("IN THE PDIP ZONING DISTRICT ZDF"), "IN THE PDIP ZONING DISTRICT")
+        self.assertEqual(filings.scrub("PARK (PDIP) SDM"), "PARK (PDIP)")
+        self.assertEqual(filings.scrub("A data center. (Bluebeam Session# 640-079-749)"), "A data center.")
+        # ordinary words and planning codes stay
+        self.assertEqual(filings.scrub("(PDIP) AND SINGLE FAMILY"), "(PDIP) AND SINGLE FAMILY")
+        self.assertEqual(filings.scrub("uses at a 0.86 FAR."), "uses at a 0.86 FAR.")
+        self.assertEqual(filings.scrub("revise Bldg VA7. (SPAM)"), "revise Bldg VA7. (SPAM)")
+
+    def test_people_are_not_published(self):
+        import filings
+        out = filings.loudoun([
+            lola("STPL-2026-0001", name="ARCOLA LAKHVINDER PROPERTY", desc="ARCOLA LAKHVINDER PROPERTY : A SITE PLAN"),
+            lola("EPLAN-2026-0002", desc="Jane Doe, Esq. of Some Firm LLC, on behalf of the owner, requests a data center"),
+        ])
+        by = {f["id"]: f for f in out}
+        self.assertEqual(by["STPL-2026-0001"]["name"], "Site plan STPL-2026-0001")
+        self.assertNotIn("LAKHVINDER", json.dumps(out).upper())
+        self.assertNotIn("Jane", json.dumps(out))
+        self.assertEqual(filings.problems(out), [])
+
+    def test_loudoun_adapter(self):
+        import filings
+        raw = [lola("LEGI-2026-0019", "Legislative Application"),
+               lola("SPEX-2026-0037", "Special Exception", desc="SEE LEGI-2026-0019 FOR DOCUMENTS"),
+               lola("EPLAN-2026-0140", status="Approved", when=dt_ms(2026, 9, 2)),
+               lola("BOND-2026-0001", "Bond"),  # paperwork: left out
+               lola("EPLAN-2019-0001", status="Approved", when=dt_ms(2019, 5, 1)),  # decided long ago: left out
+               lola("EPLAN-2018-0002", when=dt_ms(2018, 5, 1))]  # old but still in review: kept
+        out = filings.loudoun(raw)
+        self.assertEqual([f["id"] for f in out], ["EPLAN-2026-0140", "LEGI-2026-0019", "EPLAN-2018-0002"])
+        legi = out[1]
+        self.assertEqual(legi["related"], ["Special exception SPEX-2026-0037"])
+        self.assertEqual((legi["kind"], legi["status"], legi["label"]),
+                         ("land-use", "in-review", "Proposed: in county review"))
+        self.assertEqual(out[0]["label"], "Site plan approved")
+        for f in out:
+            self.assertEqual(set(f), set(filings.FIELDS))
+            self.assertAlmostEqual(f["lat"], 39.005, places=3)
+            self.assertAlmostEqual(f["lon"], -77.495, places=3)
+            self.assertIn(f["id"], f["source"])
+
+    def test_problems_catch_broken_data(self):
+        import filings
+        good = filings.loudoun([lola(f"EPLAN-2026-{i:04d}") for i in range(1, 21)])
+        self.assertEqual(filings.problems(good, good, lambda c, lon, lat: True), [])
+        self.assertTrue(filings.problems(good[:10], good))  # fell by half
+        self.assertTrue(filings.problems([]))
+        self.assertTrue(filings.problems(good, None, lambda c, lon, lat: False))  # all outside the county
+        first = good[0]["id"]
+        self.assertEqual(filings.problems(good, None, lambda c, lon, lat: True), [])
+        one_off = [dict(f, lat=37.0) if f["id"] == first else f for f in good]  # one parcel over the line: tolerated
+        self.assertEqual(filings.problems(one_off, None, lambda c, lon, lat: lat > 38), [])
+        self.assertTrue(filings.problems(good + good[:1]))  # duplicate id
+        self.assertTrue(filings.problems([dict(good[0], date="09/01/2026")]))
+        self.assertTrue(filings.problems([dict(good[0], description="Call (703) 555-0100")]))
+
+    def test_diff_logs_new_filings_and_status_changes(self):
+        import filings
+        a = filings.loudoun([lola("EPLAN-2026-0001"), lola("EPLAN-2026-0002")])
+        b = filings.loudoun([lola("EPLAN-2026-0001", status="Approved"), lola("EPLAN-2026-0002"),
+                             lola("EPLAN-2026-0003")])
+        ev = {(e["type"], e["id"]): e for e in filings.diff(a, b, "2026-10-01")}
+        self.assertEqual(set(ev), {("filing-status", "EPLAN-2026-0001"), ("filing-new", "EPLAN-2026-0003")})
+        changed = ev[("filing-status", "EPLAN-2026-0001")]
+        self.assertEqual((changed["from"], changed["to"]), ("Site plan in review", "Site plan approved"))
+
+    def test_build_keeps_yesterdays_filings_when_the_source_fails(self):
+        import tempfile
+        from unittest import mock
+        import filings
+        d = tempfile.mkdtemp()
+        county = [[-77.6, 38.9], [-77.4, 38.9], [-77.4, 39.1], [-77.6, 39.1], [-77.6, 38.9]]
+        with open(os.path.join(d, "deq_counties.json"), "w") as fh:
+            json.dump([{"attributes": {"NAME": "Loudoun", "FIPS": "107"}, "geometry": {"rings": [county]}}], fh)
+        prev = filings.loudoun([lola(f"EPLAN-2026-{i:04d}") for i in range(1, 11)])
+        with open(os.path.join(d, "filings.json"), "w") as fh:
+            json.dump(prev, fh)
+
+        def run(fetch):
+            src = [("Loudoun County", "lola.json", fetch, filings.loudoun)]
+            with mock.patch.object(build, "CACHE", d), mock.patch.object(build, "FILING_SOURCES", src), \
+                    mock.patch.object(build, "FILINGS", os.path.join(d, "filings.json")):
+                return build.build_filings()
+
+        def down():
+            raise ValueError("LOLA returned an HTML error page")
+        out, before, status = run(down)
+        self.assertEqual((out, before, status["Loudoun County"]["updated"]), (prev, prev, False))
+        out, _, status = run(lambda: [lola("EPLAN-2026-0001")])  # 1 filing instead of 10: looks broken
+        self.assertEqual((len(out), status["Loudoun County"]["updated"]), (10, False))
+        far = [[-80.0, 37.0], [-79.9, 37.0], [-79.9, 37.1], [-80.0, 37.0]]
+        out, _, status = run(lambda: [lola(f"EPLAN-2026-{i:04d}", ring=far) for i in range(1, 11)])  # not in Loudoun
+        self.assertEqual((out, status["Loudoun County"]["updated"]), (prev, False))
+        out, _, status = run(lambda: [lola(f"EPLAN-2026-{i:04d}") for i in range(1, 12)])  # one new: published
+        self.assertEqual((len(out), status["Loudoun County"]["updated"]), (11, True))
+
+
+class CommittedFilings(unittest.TestCase):
+    """site/virginia/data/filings.json: well formed, in Loudoun, sourced, and free of personal data."""
+
+    def test_committed_filings(self):
+        import re
+        import filings
+        fil = load("filings")
+        self.assertGreater(len(fil), 50)
+        self.assertEqual(len({f["id"] for f in fil}), len(fil))
+        for f in fil:
+            self.assertEqual(set(f), set(filings.FIELDS), f["id"])
+            self.assertIn(f["kind"], {"land-use", "site-plan"})
+            self.assertTrue(38.8 <= f["lat"] <= 39.35 and -77.97 <= f["lon"] <= -77.32, f["id"])  # Loudoun's extent
+            self.assertTrue(f["source"].startswith("https://logis.loudoun.gov/") and f["id"] in f["source"], f["id"])
+            text = f["name"] + " " + f["description"]
+            self.assertIsNone(filings.PERSONAL_HINTS.search(text), f["id"])
+            for w in filings.WITHHELD_NAME_WORDS:
+                self.assertNotIn(w.lower(), text.lower(), f["id"])
+            self.assertIsNone(re.search(r"DISTRI?C?T\.?\s+[A-Z]{2,3}$", f["description"]), f["id"])  # no initials
+        self.assertEqual(filings.problems(fil), [])
 
 
 class GeneratedPages(unittest.TestCase):
@@ -134,7 +276,7 @@ class GeneratedPages(unittest.TestCase):
         cfg = json.load(open(os.path.join(ROOT, "data", "site_config.json"), encoding="utf-8"))
         cls.cfg = cfg
         cls.counts = pages.build_pages(cls.dir, "virginia", load("facilities"), load("schools"), load("zips"),
-                                       load("meta"), load("changes"), cfg)
+                                       load("meta"), load("changes"), cfg, filings=load("filings"))
         cls.html = {}
         for root, _, files in os.walk(cls.dir):
             for f in files:
@@ -190,6 +332,41 @@ class GeneratedPages(unittest.TestCase):
                     continue
                 target = os.path.normpath(os.path.join(self.dir, path, href.split("#")[0]))
                 self.assertTrue(os.path.exists(target), f"{path}: broken link {href}")
+
+    def test_county_filings_on_pages(self):
+        import pages
+        loudoun = self.html["virginia/places/loudoun-county/"]
+        for f in load("filings"):  # the county page lists every filing, each linked to its county record
+            self.assertIn(html_escape(f["source"]), loudoun)
+        self.assertIn("None in the county filings this site tracks",
+                      self.html["virginia/schools/rachel-carson-middle-school-herndon/"])
+        self.assertIn("are not included yet", self.html["virginia/places/fairfax-county/"])
+        with_filings = [p for p, h in self.pages.items() if "that mention a data center, from" in h]
+        for kind in ("schools", "zip", "data-centers"):
+            self.assertTrue(any(p.startswith(f"virginia/{kind}/") for p in with_filings), kind)
+        # a school gets a page when a filing is within 2 miles even if no DEQ-listed data center is
+        for path, page in self.pages.items():
+            if path.startswith("virginia/schools/") and "show no data centers within" in page:
+                self.assertIn(f"County filings within {pages.FILING_RADIUS} miles", page)
+
+    def test_filing_events_on_new_this_week(self):
+        import tempfile
+        import pages
+        f = load("filings")[0]
+        log = {"since": "2026-09-28", "events": [
+            {"date": "2026-10-01", "type": "filing-status", "id": f["id"], "name": f["name"], "locality": f["county"],
+             "kind": f["kind"], "filing_type": f["type"], "label": f["label"], "from": "Site plan in review",
+             "to": "Site plan approved"}]}
+        ctx = {"out": tempfile.mkdtemp(), "state": "virginia", "facilities": [], "filings": [f], "log": log,
+               "cfg": self.cfg, "urls": []}
+        pages.new_page(ctx)
+        with open(os.path.join(ctx["out"], "virginia", "new", "index.html"), encoding="utf-8") as fh:
+            page = fh.read()
+        with open(os.path.join(ctx["out"], "virginia", "new", "feed.xml"), encoding="utf-8") as fh:
+            feed = fh.read()
+        self.assertIn(html_escape(f["source"]), page)
+        self.assertIn(html_escape("County filing changed from “Site plan in review” to “Site plan approved”"), page)
+        self.assertIn(f"2026-10-01-filing-status-{f['id']}", feed)
 
     def test_support_link_hidden_until_configured(self):
         if not self.cfg.get("support_url"):

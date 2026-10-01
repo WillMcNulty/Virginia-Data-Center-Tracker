@@ -7,6 +7,7 @@
   --navy: #232d4b; --orange: #e57200; --orange-tint: #fff0df; --blue-tint: #e6ebf6;
   --band: #232d4b; --band-ink: #ffffff; --band-muted: #c6cfe8; --link: #232d4b;
   --st-operating: #495e9d; --st-planned: #e57200; --st-shutdown: #8a8f98;
+  --filing: #b44ee8; /* county filings (diamonds); validated in site/virginia/index.html */
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   --mono: "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
@@ -17,7 +18,7 @@
     --page: #0d1120; --surface: #161c30; --ink: #eef1fa; --ink-2: #a6b1cf; --line: #2b3454; --axis: #34406a;
     --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
     --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5;
-    --st-operating: #6f86e0; --st-planned: #d0650a;
+    --st-operating: #6f86e0; --st-planned: #d0650a; --filing: #f0e442;
   }
 }
 :root[data-theme="dark"] {
@@ -25,7 +26,7 @@
   --page: #0d1120; --surface: #161c30; --ink: #eef1fa; --ink-2: #a6b1cf; --line: #2b3454; --axis: #34406a;
   --navy: #aebdf0; --orange: #ff8f2e; --orange-tint: #2a1e12; --blue-tint: #1e2746;
   --band: #1a2240; --band-muted: #b9c4e4; --link: #b6c4f5;
-  --st-operating: #6f86e0; --st-planned: #d0650a;
+  --st-operating: #6f86e0; --st-planned: #d0650a; --filing: #f0e442;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 16px/1.6 var(--sans); }
@@ -60,6 +61,11 @@ h2 { font: 800 12.5px var(--sans); letter-spacing: 0.08em; text-transform: upper
 .dot.planned, .dot.construction { background: var(--st-planned); }
 .dot.operating { background: var(--st-operating); }
 .dot.shutdown, .dot.other { background: var(--st-shutdown); }
+/* County filings: a diamond (solid when decided, hollow while in county review), never color alone. */
+.dia { width: 11px; height: 11px; flex: 0 0 11px; margin: 0 1px; transform: rotate(45deg); background: var(--filing); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--axis); }
+.dia.in-review { background: var(--surface); border: 3px solid var(--filing); }
+.dia.denied { background: var(--st-shutdown); }
+.tag.filing { background: none; border: 1px solid var(--axis); color: var(--ink); }
 .tag { display: inline-block; font: 700 11px var(--mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--blue-tint); color: var(--navy); }
 .tag.planned, .tag.construction { background: var(--orange-tint); color: var(--ink); }
 .plain { padding-left: 20px; }

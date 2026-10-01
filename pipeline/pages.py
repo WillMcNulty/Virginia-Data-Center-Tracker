@@ -29,6 +29,7 @@ STAGE_LABEL = {"planned": "Planned", "construction": "Under construction", "oper
                "shutdown": "Temporarily shut down", "other": "Other"}
 STAGE_ORDER = ["planned", "construction", "operating", "shutdown", "other"]
 SCHOOL_RADIUS, ZIP_RADIUS, NEIGHBOR_RADIUS = 2, 5, 1
+FILING_RADIUS = 2  # county filings are listed within 2 miles of a school, ZIP center or data center
 STATE_NAME = {"virginia": "Virginia"}
 ROOT_GENERATED = ["index.html", "about", "privacy", "sitemap.xml", "robots.txt",
                   "places", "zip", "schools", "browse"]  # the last four are the forwarding pages
@@ -147,6 +148,64 @@ def facility_list(items, up, state, with_distance=True):
     return "    <ul class=\"facs\">\n" + "\n".join(rows) + "\n    </ul>" if rows else "    <p>None on DEQ's records.</p>"
 
 
+# ---- county filings -------------------------------------------------------------------------------------------------
+
+def filing_counties(ctx):
+    """The counties whose filings the site has (Loudoun so far), as readable text."""
+    names = sorted({f["county"] for f in ctx.get("filings") or []})
+    return " and ".join(names) if names else "no county yet"
+
+
+def short(text, limit=220):
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
+
+
+def filing_list(items, up, state, with_distance=True):
+    rows = []
+    for f in items:
+        dist = f'<span class="dist">{fmt_mi(f["distance"])}</span>' if with_distance else ""
+        related = f" · with {e(', '.join(f['related']))}" if f.get("related") else ""
+        desc = f'\n        <div class="meta">{e(short(f["description"]))}</div>' if f.get("description") else ""
+        rows.append(f"""      <li class="fac">
+        <div class="fac-head"><i class="dia {e(f['status'])}" aria-hidden="true"></i><a class="nm" href="{e(f['source'])}">{e(f['name'])}</a>{dist}</div>
+        <div class="meta"><span class="tag filing">{e(f['label'])}</span> {e(f['type'])} {e(f['id'])}, filed {fmt_date(f['date'])} · {e(f['county'])}{related} ·
+          <a href="{up}{state}/#pin={f['lat']},{f['lon']}&amp;r=1">on the map</a></div>{desc}
+      </li>""")
+    return "    <ul class=\"facs\">\n" + "\n".join(rows) + "\n    </ul>"
+
+
+def filings_section(ctx, lat, lon, up):
+    """'County filings within 2 miles' for a school, ZIP code or data center page."""
+    items = near(ctx.get("filings") or [], lat, lon, FILING_RADIUS)
+    head = f"    <h2>County filings within {FILING_RADIUS} miles</h2>\n"
+    if not items:
+        return head + (f"    <p>None in the county filings this site tracks ({e(filing_counties(ctx))} so far).</p>")
+    n_review = sum(1 for f in items if f["status"] == "in-review")
+    return head + (f"    <p>{plural(len(items), 'filing')} (land-use applications and site plans) that mention a data center, from "
+                   f"{e(filing_counties(ctx))} records; {n_review} still in county review. Filings come before any DEQ "
+                   f"air permit, so some of these may not be on DEQ's records yet.</p>\n"
+                   + filing_list(items, up, ctx["state"]))
+
+
+def locality_filings(ctx, loc, up):
+    """Every tracked filing in a county, newest first: the ones in review, then the decided ones."""
+    items = [f for f in ctx.get("filings") or [] if f["county"] == loc]
+    if not items:
+        return (f"    <p class=\"note\">County filings (rezonings, special exceptions, site plans) are tracked for "
+                f"{e(filing_counties(ctx))} so far; {e(loc)}'s are not included yet.</p>")
+    review = [f for f in items if f["status"] == "in-review"]
+    decided = [f for f in items if f["status"] != "in-review"]
+    out = (f"    <h2>County filings that mention a data center</h2>\n"
+           f"    <p>{plural(len(items), 'filing')} from {e(loc)}'s land-use records: {len(review)} in county review and "
+           f"{len(decided)} decided (filed since 2021). Land-use applications go to the county board, usually after a public "
+           f"hearing; site plans are reviewed by county staff. Each links to the county record.</p>\n")
+    if review:
+        out += "    <h2>In county review</h2>\n" + filing_list(review, up, ctx["state"], with_distance=False) + "\n"
+    if decided:
+        out += "    <h2>Decided</h2>\n" + filing_list(decided, up, ctx["state"], with_distance=False) + "\n"
+    return out
+
+
 # ---- state pages ----------------------------------------------------------------------------------------------------
 
 def locality_pages(ctx):
@@ -170,7 +229,8 @@ def locality_pages(ctx):
     <p><a class="btn" href="{up}{s}/">Open the map</a></p>
 {facility_list(items, up, s, with_distance=False)}
     <p class="note">Stages are DEQ's own. Only sites that have applied for a DEQ air permit for backup generators
-      appear; earlier-stage proposals filed with the county are not included yet.</p>"""
+      appear in the list above; earlier-stage proposals are filed with the county.</p>
+{locality_filings(ctx, loc, up)}"""
         write(ctx, path, shell(path, title, desc, body, cfg))
         index.append((loc, path, len(items), n_future))
     return index
@@ -181,25 +241,35 @@ def zip_pages(ctx):
     index = []
     for z, (lat, lon) in sorted(ctx["zips"].items()):
         items = near(ctx["facilities"], lat, lon, ZIP_RADIUS)
-        if not items:
+        n_filings = len(near(ctx.get("filings") or [], lat, lon, FILING_RADIUS))
+        if not items and not n_filings:
             continue
         within1 = sum(1 for f in items if f["distance"] <= 1)
         within3 = sum(1 for f in items if f["distance"] <= 3)
         path = f"{s}/zip/{z}/"
         up = "../" * path.count("/")
         title = f"Data centers near ZIP code {z}, {STATE_NAME[s]}"
-        desc = (f"{plural(len(items), 'data center')} within {ZIP_RADIUS} miles of ZIP code {z} on Virginia DEQ's "
-                f"records ({stage_summary(items)}), nearest {fmt_mi(items[0]['distance'])} from the ZIP code's center.")
+        if items:
+            desc = (f"{plural(len(items), 'data center')} within {ZIP_RADIUS} miles of ZIP code {z} on Virginia DEQ's "
+                    f"records ({stage_summary(items)}), nearest {fmt_mi(items[0]['distance'])} from the ZIP code's center.")
+            lede = (f"<b>{plural(len(items), 'data center')}</b> within {ZIP_RADIUS} miles of the center of ZIP code {z}:\n"
+                    f"      {e(stage_summary(items))}. {within1} within 1 mile, {within3} within 3 miles.")
+        else:
+            desc = (f"No data centers within {ZIP_RADIUS} miles of ZIP code {z} on Virginia DEQ's records; "
+                    f"{plural(n_filings, 'county filing')} mentioning a data center within {FILING_RADIUS} miles.")
+            lede = (f"Virginia DEQ's records show no data centers within {ZIP_RADIUS} miles of the center of ZIP code {z}, "
+                    f"but county records show <b>{plural(n_filings, 'filing')}</b> that mention a data center within "
+                    f"{FILING_RADIUS} miles.")
         body = f"""    <p class="crumbs"><a href="{up}{s}/browse/">Browse</a> › ZIP {z}</p>
     <h1>Data centers near ZIP code {z}</h1>
-    <p class="lede"><b>{plural(len(items), 'data center')}</b> within {ZIP_RADIUS} miles of the center of ZIP code {z}:
-      {e(stage_summary(items))}. {within1} within 1 mile, {within3} within 3 miles.</p>
+    <p class="lede">{lede}</p>
     <p><a class="btn" href="{up}{s}/#zip={z}&amp;r={ZIP_RADIUS}">Open on the map</a></p>
-{facility_list(items, up, s)}
+{facility_list(items, up, s) if items else ""}
+{filings_section(ctx, lat, lon, up)}
     <p class="note">Distances are straight-line from the ZIP code's center point (Census). For a precise spot, use a
       school or drop a pin on the map.</p>"""
         write(ctx, path, shell(path, title, desc, body, cfg))
-        index.append((z, path, len(items), within1))
+        index.append((z, path, len(items), within1, n_filings))
     return index
 
 
@@ -209,7 +279,8 @@ def school_pages(ctx):
     ctx["school_path"], ctx["legacy_school"] = {}, {}
     for sc in ctx["schools"]:
         items = near(ctx["facilities"], sc["lat"], sc["lon"], SCHOOL_RADIUS)
-        if not items:
+        n_filings = len(near(ctx.get("filings") or [], sc["lat"], sc["lon"], FILING_RADIUS))
+        if not items and not n_filings:
             continue
         display = school_display(sc)
         base = slug(f"{display} {sc['city']}")
@@ -224,20 +295,27 @@ def school_pages(ctx):
         within1 = sum(1 for f in items if f["distance"] <= 1)
         aka = f" (official name: {sc['name']})" if sc.get("aka") else ""
         title = f"Data centers near {display}, {sc['city']}"
-        desc = (f"{plural(len(items), 'data center')} within {SCHOOL_RADIUS} miles of {display} in {sc['city']}, "
-                f"{STATE_NAME[s]} ({stage_summary(items)}); nearest {fmt_mi(items[0]['distance'])} away.")
+        if items:
+            desc = (f"{plural(len(items), 'data center')} within {SCHOOL_RADIUS} miles of {display} in {sc['city']}, "
+                    f"{STATE_NAME[s]} ({stage_summary(items)}); nearest {fmt_mi(items[0]['distance'])} away.")
+            found = (f"Virginia DEQ's records show <b>{plural(len(items), 'data center')}</b> within {SCHOOL_RADIUS} "
+                     f"miles: {e(stage_summary(items))}. {within1} within 1 mile.")
+        else:
+            desc = (f"No data centers within {SCHOOL_RADIUS} miles of {display} in {sc['city']}, {STATE_NAME[s]} on DEQ's "
+                    f"records; {plural(n_filings, 'county filing')} mentioning a data center within {FILING_RADIUS} miles.")
+            found = (f"Virginia DEQ's records show no data centers within {SCHOOL_RADIUS} miles, but county records show "
+                     f"<b>{plural(n_filings, 'filing')}</b> that mention a data center within {FILING_RADIUS} miles.")
         body = f"""    <p class="crumbs"><a href="{up}{s}/browse/">Browse</a> › Schools › {e(display)}</p>
     <h1>Data centers near {e(display)}</h1>
-    <p class="lede">{e(display)}{e(aka)}, {e(sc['street'])}, {e(sc['city'])}. Virginia DEQ's records show
-      <b>{plural(len(items), 'data center')}</b> within {SCHOOL_RADIUS} miles: {e(stage_summary(items))}.
-      {within1} within 1 mile.</p>
+    <p class="lede">{e(display)}{e(aka)}, {e(sc['street'])}, {e(sc['city'])}. {found}</p>
     <p><a class="btn" href="{up}{s}/#school={sc['id']}&amp;r={SCHOOL_RADIUS}">Open on the map</a></p>
-{facility_list(items, up, s)}
+{facility_list(items, up, s) if items else ""}
+{filings_section(ctx, sc["lat"], sc["lon"], up)}
     <p class="note">Straight-line distance from the school's location (National Center for Education Statistics).
       Virginia's 2026 siting law requires a sound study covering schools within 500 feet of a new high-energy
       facility before a county can approve it.</p>"""
         write(ctx, path, shell(path, title, desc, body, cfg))
-        index.append((f"{display} ({sc['city']})", path, len(items), within1))
+        index.append((f"{display} ({sc['city']})", path, len(items), within1, n_filings))
     return index
 
 
@@ -274,6 +352,7 @@ def facility_pages(ctx):
     <ul class="plain">{school_items}</ul>
     <h2>Other data centers within {NEIGHBOR_RADIUS} mile</h2>
 {facility_list(neighbors, up, s)}
+{filings_section(ctx, f["lat"], f["lon"], up)}
     <h2>Source</h2>
     <p><a href="{DEQ_RECORD.format(f['id'])}">DEQ Air Sites record {f['id']}</a> (permit class: {e(f.get('permit_class') or 'not given')}).
       The stage is DEQ's own. This page is rebuilt every morning from DEQ's records.</p>"""
@@ -286,12 +365,15 @@ EVENT_TEXT = {
     "permit": lambda ev: f"Air permit issued {fmt_date(ev.get('to')) or ''}",
     "renamed": lambda ev: f"Renamed from “{ev.get('from')}”",
     "removed": lambda ev: "No longer on DEQ's data center records",
+    "filing-new": lambda ev: f"New county filing: {ev.get('filing_type', 'application')} ({ev.get('label', '')})",
+    "filing-status": lambda ev: f"County filing changed from “{ev.get('from')}” to “{ev.get('to')}”",
 }
 
 
 def new_page(ctx):
     s, cfg, log = ctx["state"], ctx["cfg"], ctx["log"]
     by_id = {f["id"]: f for f in ctx["facilities"]}
+    filing_by_id = {f["id"]: f for f in ctx.get("filings") or []}
     path = f"{s}/new/"
     up = "../" * path.count("/")
     weeks = {}
@@ -303,8 +385,9 @@ def new_page(ctx):
     for monday in sorted(weeks, reverse=True):
         items = []
         for ev in weeks[monday]:
-            f = by_id.get(ev["id"])
-            name = f'<a href="{up}{facility_path(s, f)}">{e(ev["name"])}</a>' if f else e(ev["name"])
+            f, fil = by_id.get(ev["id"]), filing_by_id.get(ev["id"])
+            name = (f'<a href="{up}{facility_path(s, f)}">{e(ev["name"])}</a>' if f else
+                    f'<a href="{e(fil["source"])}">{e(ev["name"])}</a> ({e(ev["id"])})' if fil else e(ev["name"]))
             items.append(f"<li><b>{name}</b> ({e(ev.get('locality') or '')}): {e(EVENT_TEXT[ev['type']](ev))} "
                          f"<span class=\"when\">{fmt_date(ev['date'])}</span></li>")
         parts.append(f"    <h2>Week of {fmt_date(monday.isoformat())}</h2>\n    <ul class=\"plain\">{''.join(items)}</ul>")
@@ -313,7 +396,8 @@ def new_page(ctx):
         "This page updates every morning.</p>")
     body = f"""    <h1>New this week</h1>
     <p class="lede">What changed on Virginia DEQ's data center records: new sites, stage changes (planned, under
-      construction, operating) and new air permits. Checked every morning since {fmt_date(log['since'])}.
+      construction, operating) and new air permits; plus new county filings that mention a data center and their
+      status changes ({e(filing_counties(ctx))} so far). Checked every morning since {fmt_date(log['since'])}.
       <a href="feed.xml">Subscribe by RSS</a>.</p>
 {changes}"""
     write(ctx, path, shell(path, "New this week: Virginia data center records",
@@ -322,8 +406,8 @@ def new_page(ctx):
     base = cfg["site_url"].rstrip("/")
     items = []
     for ev in log["events"][:50]:
-        f = by_id.get(ev["id"])
-        link = f"{base}/{facility_path(s, f)}" if f else f"{base}/{path}"
+        f, fil = by_id.get(ev["id"]), filing_by_id.get(ev["id"])
+        link = f"{base}/{facility_path(s, f)}" if f else fil["source"] if fil else f"{base}/{path}"
         pub = dt.datetime.fromisoformat(ev["date"] + "T12:00:00+00:00").strftime("%a, %d %b %Y %H:%M:%S +0000")
         items.append(f"<item><title>{e(ev['name'])}: {e(EVENT_TEXT[ev['type']](ev))}</title><link>{e(link)}</link>"
                      f"<guid isPermaLink=\"false\">{e(ev['date'])}-{e(ev['type'])}-{ev['id']}</guid><pubDate>{pub}</pubDate>"
@@ -333,6 +417,11 @@ def new_page(ctx):
            + "".join(items) + "</channel></rss>\n")
     with open(os.path.join(ctx["out"], path, "feed.xml"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(rss)
+
+
+def filings_note(row):
+    """', 3 county filings within 2 mi' for a browse-index row (school or ZIP) that has any."""
+    return f", {plural(row[4], 'county filing')} within {FILING_RADIUS} mi" if len(row) > 4 and row[4] else ""
 
 
 def browse_page(ctx, loc_idx, zip_idx, school_idx):
@@ -348,9 +437,11 @@ def browse_page(ctx, loc_idx, zip_idx, school_idx):
     <h2>Counties and cities</h2>
     {ul(loc_idx, lambda r: f'<li><a href="{up}{r[1]}">{e(r[0])}</a> <span>{plural(r[2], "data center")}' + (f', {r[3]} not yet operating' if r[3] else '') + '</span></li>')}
     <h2>Schools with a data center within {SCHOOL_RADIUS} miles</h2>
-    {ul(sorted(school_idx), lambda r: f'<li><a href="{up}{r[1]}">{e(r[0])}</a> <span>{r[2]} within {SCHOOL_RADIUS} mi, {r[3]} within 1 mi</span></li>')}
+    {ul(sorted(school_idx), lambda r: f'<li><a href="{up}{r[1]}">{e(r[0])}</a> <span>{r[2]} within {SCHOOL_RADIUS} mi, {r[3]} within 1 mi' + filings_note(r) + '</span></li>')}
     <h2>ZIP codes with a data center within {ZIP_RADIUS} miles</h2>
-    {ul(zip_idx, lambda r: f'<li><a href="{up}{r[1]}">{r[0]}</a> <span>{r[2]} within {ZIP_RADIUS} mi</span></li>')}"""
+    {ul(zip_idx, lambda r: f'<li><a href="{up}{r[1]}">{r[0]}</a> <span>{r[2]} within {ZIP_RADIUS} mi' + filings_note(r) + '</span></li>')}
+    <p class="note">Schools and ZIP codes are also listed when a county filing that mentions a data center is within
+      {FILING_RADIUS} miles ({e(filing_counties(ctx))} so far), even before any DEQ record.</p>"""
     write(ctx, path, shell(path, f"Browse {STATE_NAME[s]} data centers by county, ZIP code or school",
                            f"Every {STATE_NAME[s]} county, ZIP code and public school with a data center nearby, from state records.", body, cfg))
 
@@ -408,10 +499,14 @@ def about_page(ctx):
       issued data center air permits. Schools are from the National Center for Education Statistics and ZIP codes
       from the U.S. Census Bureau. The data refreshes every morning, changes are logged on "New this week", and the
       build refuses to publish if a source looks broken. Every site links to its DEQ record.</p>
+    <p>Earlier-stage proposals come from county records: land-use applications (rezonings, special exceptions) and
+      site plans that mention a data center, from {e(filing_counties(ctx))}'s public land application records so far.
+      They're shown as diamonds on the map and listed on school, ZIP code, county and data center pages, each linked
+      to its county record. The status is the county's own.</p>
     <h2>What's not here yet</h2>
-    <p>Earlier-stage proposals (rezonings and special exceptions filed with a county before any air permit), cost
-      and size from county building permits, and, by ZIP code, the upcoming hearings, comment periods and elections
-      where residents can weigh in. Those are being added next, then more states.</p>
+    <p>County filings from other counties, cost and size from county building permits, and, by ZIP code, the
+      upcoming hearings, comment periods and elections where residents can weigh in. Those are being added next,
+      then more states.</p>
     <h2>Who made it</h2>
     <p>William McNulty, a Computer Science and Economics student at the University of Virginia. An independent project,
       not affiliated with Virginia DEQ, any locality or any company shown. <a href="{e(cfg['contact_url'])}">Contact</a> ·
@@ -475,7 +570,7 @@ def write(ctx, path, text):
     ctx["urls"].append(path)
 
 
-def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg):
+def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg, filings=None):
     for name in ROOT_GENERATED:
         p = os.path.join(site_dir, name)
         shutil.rmtree(p) if os.path.isdir(p) else (os.remove(p) if os.path.exists(p) else None)
@@ -484,7 +579,7 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg):
         if os.path.isdir(p):
             shutil.rmtree(p)
     ctx = {"out": site_dir, "state": state, "facilities": facilities, "schools": schools, "zips": zips,
-           "meta": meta, "log": log, "cfg": cfg, "urls": []}
+           "meta": meta, "log": log, "cfg": cfg, "urls": [], "filings": filings or []}
     loc_idx = locality_pages(ctx)
     zip_idx = zip_pages(ctx)
     ctx["zip_has_page"] = {r[0]: True for r in zip_idx}

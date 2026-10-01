@@ -6,7 +6,13 @@ appends any differences to site/virginia/data/changes.json, which is committed t
   {"since": "2026-09-30", "events": [
      {"date": "2026-10-02", "type": "new", "id": 74350, "name": "...", "locality": "...", "stage": "planned"},
      {"date": "2026-10-05", "type": "stage", "id": 74332, ..., "from": "planned", "to": "construction"},
-     {"date": "...", "type": "removed" | "permit" | "renamed", ...}]}
+     {"date": "...", "type": "removed" | "permit" | "renamed", ...},
+     {"date": "...", "type": "filing-new", "id": "EPLAN-2026-0140", "name": "...", "locality": "Loudoun County",
+      "kind": "site-plan", "filing_type": "Site plan", "label": "Site plan in review"},
+     {"date": "...", "type": "filing-status", "id": "LEGI-...", ..., "from": "<old label>", "to": "<new label>"}]}
+
+Facility events have DEQ registration numbers (integers) as ids; county filing events (see filings.diff) have the
+county's plan numbers (strings).
 
 Rebuilding twice on the same day doesn't log the same change twice. The "New this week" page, its RSS feed and
 (later) email alerts all read this file.
@@ -53,7 +59,12 @@ def update(path, before, after, date):
     log = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {"since": date, "events": []}
     if before is None:
         return log, []
+    return log, add(log, diff(before, after, date))
+
+
+def add(log, events):
+    """Put `events` at the top of `log` (newest first), skipping any already logged. Returns the ones added."""
     seen = {tuple(e.get(k) for k in KEYS) for e in log["events"]}
-    added = [e for e in diff(before, after, date) if tuple(e.get(k) for k in KEYS) not in seen]
-    log["events"] = added + log["events"]  # newest first
-    return log, added
+    added = [e for e in events if tuple(e.get(k) for k in KEYS) not in seen]
+    log["events"] = added + log["events"]
+    return added

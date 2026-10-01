@@ -39,7 +39,7 @@ jobs:
         run: |
           # meta.json's build time changes every run; only commit when the data itself changed
           # (changes.json, the change log, only changes when facilities.json does).
-          if git diff --quiet -- site/virginia/data/facilities.json site/virginia/data/schools.json site/virginia/data/zips.json; then
+          if git diff --quiet -- site/virginia/data/facilities.json site/virginia/data/schools.json site/virginia/data/zips.json site/virginia/data/filings.json; then
             echo "No data changes."
           else
             git config user.name "github-actions[bot]"
