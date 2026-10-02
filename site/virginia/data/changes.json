@@ -2,6 +2,26 @@
  "since": "2026-09-28",
  "events": [
   {
+   "date": "2026-10-02",
+   "type": "stage",
+   "id": 74276,
+   "name": "H5 Data Centers - Ashburn",
+   "locality": "Loudoun County",
+   "stage": "operating",
+   "from": "planned",
+   "to": "operating"
+  },
+  {
+   "date": "2026-10-02",
+   "type": "stage",
+   "id": 74287,
+   "name": "Vantage Data Centers VA16 LLC",
+   "locality": "Loudoun County",
+   "stage": "operating",
+   "from": "planned",
+   "to": "operating"
+  },
+  {
    "date": "2026-09-30",
    "type": "stage",
    "id": 74290,
