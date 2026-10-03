@@ -1484,8 +1484,8 @@
 "date": "2023-06-09",
 "name": "BRAMBLETON BUSINESS CAMPUS DATA CENTER",
 "description": "BRAMBLETON BUSINESS CAMPUS DATA CENTER : REQUEST APPROVAL OF A SITE PLAN (STPL) FOR THE CONSTRUCTION OF A TWO (2) DATA CENTERS AND SUPPORTING UTILITIES, IN THE PLANNED DEVELOPMENT INDUSTRIAL PARK (PDIP) AND THE PLANNED DEVELOPMENT - ACTIVE ADULT AGE RESTRICTED (PDAAAR) ZONING DISTRICT.",
-"lat": 38.955655,
-"lon": -77.519294,
+"lat": 38.954071,
+"lon": -77.518921,
 "source": "https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0/query?where=PlanNumber%3D%27STPL-2023-0028%27&outFields=PlanNumber,PlanApplicationDate,PlanType,PlanStatus,PlanName,PlanDescription&returnGeometry=false&f=html",
 "related": []
 },
