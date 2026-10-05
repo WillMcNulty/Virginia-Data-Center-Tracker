@@ -641,7 +641,7 @@
 "label": "Site plan in review",
 "date": "2024-12-31",
 "name": "Project Motion - Phase 4",
-"description": "PROJECT MOTION - PH 4: Site Plan for Data Center and support facilities.",
+"description": "(Conditional Approval) PROJECT MOTION - PH 4: Site Plan for Data Center and support facilities.",
 "lat": 38.942354,
 "lon": -77.528642,
 "source": "https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0/query?where=PlanNumber%3D%27EPLAN-2024-0212%27&outFields=PlanNumber,PlanApplicationDate,PlanType,PlanStatus,PlanName,PlanDescription&returnGeometry=false&f=html",
