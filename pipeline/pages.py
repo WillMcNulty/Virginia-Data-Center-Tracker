@@ -35,7 +35,7 @@ STAGE_ORDER = ["planned", "construction", "operating", "shutdown", "other"]
 SCHOOL_RADIUS, ZIP_RADIUS, NEIGHBOR_RADIUS = 2, 5, 1
 FILING_RADIUS = 2  # county filings are listed within 2 miles of a school, ZIP center or data center
 STATE_NAME = {"virginia": "Virginia"}
-ROOT_GENERATED = ["index.html", "about", "privacy", "data", "methodology", "sitemap.xml", "robots.txt",
+ROOT_GENERATED = ["index.html", "about", "privacy", "data", "methodology", "terms", "sitemap.xml", "robots.txt",
                   "places", "zip", "schools", "browse"]  # the last four are the forwarding pages
 STATE_GENERATED = ["places", "zip", "schools", "data-centers", "new", "browse", "meetings"]
 DEQ_RECORD = "https://apps.deq.virginia.gov/arcgis/rest/services/public/EDMA/MapServer/294/query?where=PLA_REG_NUM%3D{}&amp;outFields=*&amp;f=html"
@@ -127,7 +127,7 @@ def shell(path, title, description, body, cfg, state="virginia", card=None):
   <footer class="band">
     <div class="wrap">
       <div>An independent project; not affiliated with Virginia DEQ, any locality, or any company shown.
-        Data from public state records. <a href="{up}privacy/">Privacy</a> · <a href="{up}about/">About</a> · <a href="{up}data/">Data</a> · <a href="{up}methodology/">Methodology</a> ·
+        Data from public state records. <a href="{up}privacy/">Privacy</a> · <a href="{up}about/">About</a> · <a href="{up}data/">Data</a> · <a href="{up}methodology/">Methodology</a> · <a href="{up}terms/">Terms</a> ·
         <a href="https://github.com/WillMcNulty/Virginia-Data-Center-Tracker">Code</a></div>
     </div>
   </footer>
@@ -669,8 +669,9 @@ def about_page(ctx):
       from the U.S. Census Bureau. The data refreshes every morning, changes are logged on "New this week", and the
       build refuses to publish if a source looks broken. Every site links to its DEQ record. The
       <a href="../methodology/">methodology</a> explains each source and its known issues, and the
-      <a href="../data/">data downloads</a> page has the data as spreadsheets (free to reuse with attribution) and
-      an embed code for the map.</p>
+      <a href="../data/">data downloads</a> page has the data as spreadsheets (free with credit for non-commercial
+      use and news reporting; see the <a href="../terms/#data-license">data license</a>) and an embed code for the
+      map.</p>
     <p>Earlier-stage proposals come from county records: land-use applications (rezonings, special exceptions) and
       site plans that mention a data center, from {e(filing_counties(ctx))}'s public land application records so far.
       They're shown as diamonds on the map and listed on school, ZIP code, county and data center pages, each linked
@@ -801,13 +802,23 @@ def data_page(ctx):
       in <a href="{up}{s}/data/facilities.json">facilities.json</a>, <a href="{up}{s}/data/changes.json">changes.json</a>
       and <a href="{up}{s}/data/filings.json">filings.json</a>. No personal data is included: no visitor data, no
       county staff names or emails, and no private landowner names.</p>
-    <h2>Reusing this data</h2>
-    <p>You may reuse, republish and adapt these files, including in news stories and research, with attribution:
-      credit “Data Centers Near You, from Virginia DEQ and county records” and link to
-      <a href="{e(base)}/">{e(base)}/</a>. The underlying public records belong to their publishers (Virginia DEQ,
-      the counties, NCES and the Census Bureau), and their own terms and notices still apply; DEQ's data notice is
-      on the map page. Stages and statuses are the agencies' own; anything this site calculates is marked as ours in
-      the column notes below. Please check important facts against the linked official record.</p>
+    <h2 id="reuse">Reusing this data</h2>
+    <p><b>Free with credit for non-commercial use, and for news reporting.</b> The files are licensed under
+      <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> with extra permissions:</p>
+    <ul class="plain">
+      <li><b>Journalists and news organizations</b> may use the data in their reporting (stories, charts, maps,
+        broadcasts), including in publications with ads or subscriptions.</li>
+      <li><b>Anyone</b> may embed the map with the embed code below.</li>
+      <li><b>Governments, schools and non-profit researchers</b> may use it in their public work.</li>
+    </ul>
+    <p>Credit it as: <i>Data: Data Centers Near You (<a href="{e(base)}/">{e(base)}/</a>), compiled from Virginia DEQ
+      and county records.</i> <b>Commercial use</b> (resale, products, apps, APIs, alert services, consulting and
+      industry use) needs a license: <a href="{e(cfg['contact_url'])}">get in touch</a>. The full terms are in the
+      <a href="{up}terms/#data-license">data license</a>.</p>
+    <p>The public records behind the data belong to their publishers (Virginia DEQ, the counties, NCES and the Census
+      Bureau), and anyone can get them from those publishers; this license covers our compilation and what we add to
+      it. Stages and statuses are the agencies' own; anything this site calculates is marked as ours in the column
+      notes below. Check important facts against the linked official record.</p>
     <h2>Columns</h2>
     <h3>{e(files["data-centers"][0])}</h3>
 {columns_table("data-centers")}
@@ -963,7 +974,8 @@ def methodology_page(ctx):
     <p class="note">Spotted a mistake? Each item on the site links to its official record; if the site differs from
       the record, the record is right. <a href="{e(cfg['contact_url'])}">Tell us</a> and it will be fixed. The full
       source notes, including dates checked, are in the
-      <a href="{CODE}/blob/main/data/sources.md">project's source notes</a>.</p>"""
+      <a href="{CODE}/blob/main/data/sources.md">project's source notes</a>. Reuse terms are on the
+      <a href="{up}terms/">terms page</a>.</p>"""
     write(ctx, path, shell(path, "Methodology · Data Centers Near You",
                            "Where the data comes from, how stages and distances work, what this site calculates "
                            "itself, and known issues.", body, cfg))
@@ -991,6 +1003,79 @@ def legacy_redirects(ctx, pairs):
 
 
 # ---- output -------------------------------------------------------------------------------------------------------
+
+# ---- terms: LICENSE.md and DATA-LICENSE.md, rendered (the site keeps them visible once the repo is private) --------
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TERMS_FILES = [("site-terms", "LICENSE.md"), ("data-license", "DATA-LICENSE.md")]
+TERMS_LINKS = {name: f"#{anchor}" for anchor, name in TERMS_FILES}
+
+
+def md_inline(text):
+    """Escape, then the inline Markdown the license files use: [text](url), bare https links, **bold**, `code`."""
+    def fmt(t):
+        t = e(t, quote=False)
+        t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        return re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+    out, pos = [], 0
+    for m in re.finditer(r"\[([^\]]+)\]\(([^)\s]+)\)|(https?://[^\s<>()]*[^\s<>().,;:])", text):
+        out.append(fmt(text[pos:m.start()]))
+        if m.group(1):
+            href = TERMS_LINKS.get(m.group(2), m.group(2))
+            out.append(f'<a href="{e(href)}">{fmt(m.group(1))}</a>')
+        else:
+            out.append(f'<a href="{e(m.group(3))}">{e(m.group(3))}</a>')
+        pos = m.end()
+    return "".join(out) + fmt(text[pos:])
+
+
+def md_html(md, shift=1):
+    """The small block subset of Markdown the license files use: headings (shifted down `shift` levels), paragraphs,
+    > quotes, and - or 1. lists with one level of nesting. Not a general Markdown renderer."""
+    html_out = []
+    for block in re.split(r"\n\s*\n", md.strip()):
+        lines = block.split("\n")
+        first = lines[0]
+        if first.startswith("#"):
+            level = min(6, len(first) - len(first.lstrip("#")) + shift)
+            html_out.append(f"<h{level}>{md_inline(first.lstrip('#').strip())}</h{level}>")
+        elif first.startswith(">"):
+            html_out.append("<blockquote><p>" + md_inline(" ".join(l.lstrip("> ").strip() for l in lines)) + "</p></blockquote>")
+        elif re.match(r"(- |\d+\. )", first):
+            tag = "ol" if first[0].isdigit() else "ul"
+            items = []  # [text, [sub-items]]
+            for l in lines:
+                if re.match(r"(- |\d+\. )", l):
+                    items.append([re.sub(r"^(- |\d+\. )", "", l), []])
+                elif re.match(r"\s{2,}- ", l):
+                    items[-1][1].append(l.strip()[2:])
+                elif items[-1][1]:
+                    items[-1][1][-1] += " " + l.strip()
+                else:
+                    items[-1][0] += " " + l.strip()
+            lis = "".join(f"<li>{md_inline(t)}" + (f"<ul>{''.join(f'<li>{md_inline(x)}</li>' for x in sub)}</ul>" if sub else "")
+                          + "</li>" for t, sub in items)
+            html_out.append(f"<{tag}>{lis}</{tag}>")
+        else:
+            html_out.append(f"<p>{md_inline(' '.join(l.strip() for l in lines))}</p>")
+    return "\n".join(html_out)
+
+
+def terms_page(ctx):
+    cfg = ctx["cfg"]
+    parts = []
+    for anchor, name in TERMS_FILES:
+        md = open(os.path.join(REPO, name), encoding="utf-8").read()
+        parts.append(f'    <section id="{anchor}" class="terms">\n{md_html(md)}\n    </section>')
+    body = f"""    <h1>Terms</h1>
+    <p class="lede">How you may use what's on this site. In short: the data is free with credit for non-commercial
+      use and for news reporting (<a href="#data-license">data license</a>); commercial use needs a license; the
+      code, writing and design are all rights reserved (<a href="#site-terms">site terms</a>).</p>
+{chr(10).join(parts)}"""
+    write(ctx, "terms/", shell("terms/", "Terms · Data Centers Near You",
+                               "Reuse terms for Data Centers Near You: the data license (CC BY-NC-SA 4.0 with extra "
+                               "permissions for news reporting and embedding) and the site terms.", body, cfg))
+
 
 def write(ctx, path, text):
     d = os.path.join(ctx["out"], path)
@@ -1025,6 +1110,7 @@ def build_pages(site_dir, state, facilities, schools, zips, meta, log, cfg, fili
     privacy_page(ctx)
     data_page(ctx)  # also writes the CSV downloads (pipeline/downloads.py), checked like the build's data
     methodology_page(ctx)
+    terms_page(ctx)
     # forward the first version's addresses to the new ones
     old_new = [("browse/", f"{state}/browse/")]
     old_new += [(p.replace(f"{state}/", "", 1), p) for p in ctx["urls"]

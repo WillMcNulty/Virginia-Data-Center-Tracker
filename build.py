@@ -154,6 +154,9 @@ def build(offline=False):
         "schools": len(schools),
         "zips": len(zips),
         "deq_disclaimer": disclaimer,
+        # Reuse terms for anyone reading the JSON directly (the CSVs can't carry them); see DATA-LICENSE.md.
+        "license": "CC BY-NC-SA 4.0, with extra permissions for news reporting, embedding, government, education and "
+                   "research; commercial use needs a license. Terms: " + CONFIG["site_url"].rstrip("/") + "/terms/",
         # Site settings the page needs (the donate link stays hidden while support_url is null).
         "support_url": CONFIG.get("support_url"),
         "support_label": CONFIG.get("support_label"),

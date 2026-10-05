@@ -97,3 +97,9 @@ footer a { color: var(--band-ink); }
 .embedform input:not([type=radio]), .embedform select, .embedform textarea { font: inherit; font-size: 15px; padding: 5px 8px; border: 1px solid var(--axis); border-radius: 6px; background: var(--page); color: var(--ink); max-width: 100%; }
 .embedform textarea { display: block; width: 100%; box-sizing: border-box; font: 13px var(--mono); margin-top: 6px; }
 .embedform > label { font-weight: 600; }
+/* /terms/: LICENSE.md and DATA-LICENSE.md rendered (pipeline/pages.py terms_page) */
+.terms { max-width: 75ch; border-top: 1px solid var(--line); margin-top: 22px; }
+.terms h4 { font: 700 14px var(--sans); color: var(--ink); margin: 14px 0 4px; }
+.terms blockquote { margin: 10px 0; padding: 8px 14px; background: var(--blue-tint); border-left: 3px solid var(--navy); }
+.terms blockquote p { margin: 0; }
+.terms li { margin: 4px 0; }

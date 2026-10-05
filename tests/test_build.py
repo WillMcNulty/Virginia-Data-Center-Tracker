@@ -431,7 +431,9 @@ class GeneratedPages(unittest.TestCase):
         data, meth = self.html["data/"], self.html["methodology/"]
         for name in ("virginia-data-centers.csv", "virginia-changes.csv", "virginia-county-filings.csv"):
             self.assertIn(f'href="{name}"', data)
-        self.assertIn("with attribution", data)
+        self.assertIn("CC BY-NC-SA 4.0", data)
+        self.assertIn('href="../terms/#data-license"', data)
+        self.assertNotIn("You may reuse, republish and adapt", data)  # the pre-license note (see DATA-LICENSE.md 9)
         self.assertIn('id="embedform"', data)
         self.assertIn(f'data-base="{self.cfg["site_url"]}/virginia/"', data)
         for page in (self.html["about/"],):
@@ -441,6 +443,16 @@ class GeneratedPages(unittest.TestCase):
             up = "../" * path.count("/")
             self.assertIn(f'<a href="{up}data/">Data</a>', page, path)
             self.assertIn(f'<a href="{up}methodology/">Methodology</a>', page, path)
+            self.assertIn(f'<a href="{up}terms/">Terms</a>', page, path)
+        terms = self.html["terms/"]  # LICENSE.md and DATA-LICENSE.md, rendered
+        self.assertIn(f"<loc>{self.cfg['site_url']}/terms/</loc>", sitemap)
+        self.assertIn('id="site-terms"', terms)
+        self.assertIn('id="data-license"', terms)
+        for text in ("CC BY-NC-SA 4.0", "News reporting", "Embedding the map", "All rights reserved",
+                     "Earlier versions", "https://geohub-vadeq.hub.arcgis.com/pages/terms-of-use"):
+            self.assertIn(text, terms)
+        self.assertNotRegex(terms, r"\*\*|\]\(|\[CONTACT\]|\[SITE\]|\[EFFECTIVE DATE\]")  # nothing left unrendered
+        self.assertIn('href="#data-license"', terms)  # links between the two files stay on the page
         for text in ("Manassas", "74118", "haversine", "robots.txt", "In Review", "Loudoun only so far",
                      "issued-air-permits-for-data-centers", "MapServer/294", "LOLA_DATA"):
             self.assertIn(text, meth)
@@ -493,6 +505,25 @@ class GeneratedPages(unittest.TestCase):
         self.assertLess(sum(sizes) / len(sizes), 20_000)
         for f in files[:25]:
             self.assertEqual(png_info(f), (1200, 630, 3), f)  # color type 3: palette
+
+
+class Terms(unittest.TestCase):
+    """LICENSE.md and DATA-LICENSE.md are the reuse terms; /terms/ renders them so they stay public."""
+
+    def test_markdown_subset(self):
+        import pages
+        out = pages.md_html("# T\n\nA **b** [x](DATA-LICENSE.md) <i> https://e.org/a.\n\n"
+                            "- one\n  more\n  - sub\n- two\n\n> q\n> r")
+        self.assertIn("<h2>T</h2>", out)
+        self.assertIn('<b>b</b> <a href="#data-license">x</a> &lt;i&gt; <a href="https://e.org/a">https://e.org/a</a>.', out)
+        self.assertIn("<ul><li>one more<ul><li>sub</li></ul></li><li>two</li></ul>", out)
+        self.assertIn("<blockquote><p>q r</p></blockquote>", out)
+
+    def test_license_files_name_no_trademark(self):
+        for name in ("LICENSE.md", "DATA-LICENSE.md"):
+            text = open(os.path.join(ROOT, name), encoding="utf-8").read()
+            self.assertNotIn("trademark", text.lower(), name)  # the owner holds no trademark; don't claim one
+            self.assertNotIn("™", text, name)
 
 
 class Downloads(unittest.TestCase):

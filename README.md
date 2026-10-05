@@ -135,3 +135,13 @@ its row and facility counts to `test_permit_snapshot_matches_deq_page`.
 Data: Virginia Department of Environmental Quality; National Center for Education Statistics; U.S. Census Bureau.
 Map: [MapLibre GL JS](https://maplibre.org/) (BSD-3-Clause, license in `site/vendor/LICENSE`),
 [OpenFreeMap](https://openfreemap.org/), © OpenMapTiles, data © OpenStreetMap contributors.
+
+## License
+
+- **Data** (the CSVs on `/data/` and the JSON under `/virginia/data/`): CC BY-NC-SA 4.0, with extra permissions for
+  news reporting, embedding the map, and government, education and research use; commercial use needs a license.
+  See [DATA-LICENSE.md](DATA-LICENSE.md).
+- **Code, writing, images and design**: all rights reserved; the code is shown so the method can be checked. See
+  [LICENSE.md](LICENSE.md).
+- Both are also published on the site at `/terms/`. Third-party material (MapLibre, the DejaVu fonts, map tiles, and
+  the public records) keeps its own terms.

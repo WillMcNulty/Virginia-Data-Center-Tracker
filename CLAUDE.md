@@ -24,6 +24,9 @@ The task backlog for parallel work is **`docs/BACKLOG.md`** in this repo.
   snapshot in `data/`. Use official APIs/ArcGIS REST services.
 - **Critical infrastructure:** don't publish precise fiber routes or combine detailed infrastructure layers into a
   targeting map; keep to already-public, coarse data within each source's terms.
+- **Reuse terms** are `LICENSE.md` (code/writing/design: all rights reserved) and `DATA-LICENSE.md` (data:
+  CC BY-NC-SA 4.0 + extra permissions; commercial use needs a license), rendered at `/terms/`. Don't describe the
+  data as freely reusable anywhere else, and don't claim a trademark (the owner holds none).
 - The build must **refuse to publish broken data** (see `check()` in `build.py`); keep and extend those guards.
 
 ## Layout
@@ -43,6 +46,7 @@ pipeline/civic.py        county meetings with data center items (Granicus agenda
                          robots.txt (all three hosts disallow bots), so meetings.json is refreshed by hand (--saved DIR)
 site/virginia/index.html + app.js   the map app (MapLibre from site/vendor, OpenFreeMap tiles)
 site/geo.js, theme.js, pages.css    shared by all pages; theme.js = Auto/Light/Dark switcher shared across the owner's sites
+LICENSE.md, DATA-LICENSE.md  reuse terms; pipeline/pages.py terms_page() renders both at /terms/
 data/                    site_config.json (site_url, hidden support_url), DEQ permit snapshot, school aliases, sources.md
 tests/                   test_build.py (python -m unittest discover tests), geo.test.mjs (node tests/geo.test.mjs)
 ```
