@@ -9,8 +9,8 @@
 "date": "2026-09-17",
 "name": "Cross Mill Center",
 "description": "CROSS MILL CENTER - This plan proposes the development of two data center buildings with associated infrastructure and construction of proffered road improvmeents along Sycolin Road",
-"lat": 39.062385,
-"lon": -77.551505,
+"lat": 39.062954,
+"lon": -77.550428,
 "source": "https://logis.loudoun.gov/gis/rest/services/Projects/LOLA_DATA/MapServer/0/query?where=PlanNumber%3D%27EPLAN-2026-0140%27&outFields=PlanNumber,PlanApplicationDate,PlanType,PlanStatus,PlanName,PlanDescription&returnGeometry=false&f=html",
 "related": []
 },
